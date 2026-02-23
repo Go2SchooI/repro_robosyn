@@ -1,0 +1,1 @@
+bash scripts/teacher_baoding.sh 0 test=True checkpoint=/home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-02-23_01-48-25-83810/nn/last_baoding_ep_2700_rew_1187.106.pth headless=False task.env.numEnvs=16

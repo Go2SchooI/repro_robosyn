@@ -6,7 +6,7 @@ EXTRA_ARGS=${array[@]:1:$len}
 EXTRA_ARGS_SLUG=${EXTRA_ARGS// /_}
 
 CUDA_VISIBLE_DEVICES=${GPUS} \
-python ./isaacgymenvs/train.py headless=False \
+python ./isaacgymenvs/train.py headless=True \
 task.env.objSet=ball task=AllegroArmMOAR task.env.axis=z \
 task.env.numEnvs=8192 train.params.config.minibatch_size=16384 \
 train.params.config.central_value_config.minibatch_size=16384 \
