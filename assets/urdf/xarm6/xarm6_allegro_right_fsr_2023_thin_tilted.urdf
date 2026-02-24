@@ -4,6 +4,12 @@
 <!-- |    EDITING THIS FILE BY HAND IS NOT RECOMMENDED                                 | -->
 <!-- =================================================================================== -->
 <robot name="xarm6">
+  <mujoco>
+        <compiler 
+        meshdir="../meshes_mujoco/" 
+        balanceinertia="true" 
+        discardvisual="false" />
+  </mujoco>
   <link name="world"/>
   <joint name="world_joint" type="fixed">
     <parent link="world"/>
@@ -28,14 +34,14 @@
   <link name="link_base">
     <visual>
       <geometry>
-        <mesh filename="meshes/base.stl"/>
+        <mesh filename="base.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <material name="White"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="meshes/base.stl"/>
+        <mesh filename="base.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </collision>
@@ -48,14 +54,14 @@
   <link name="link1">
     <visual>
       <geometry>
-        <mesh filename="meshes/link1.stl"/>
+        <mesh filename="link1.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <material name="White"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="meshes/link1.stl"/>
+        <mesh filename="link1.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </collision>
@@ -76,14 +82,14 @@
   <link name="link2">
     <visual>
       <geometry>
-        <mesh filename="meshes/link2.stl"/>
+        <mesh filename="link2.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <material name="White"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="meshes/link2.stl"/>
+        <mesh filename="link2.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </collision>
@@ -104,14 +110,14 @@
   <link name="link3">
     <visual>
       <geometry>
-        <mesh filename="meshes/link3.stl"/>
+        <mesh filename="link3.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <material name="White"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="meshes/link3.stl"/>
+        <mesh filename="link3.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </collision>
@@ -132,14 +138,14 @@
   <link name="link4">
     <visual>
       <geometry>
-        <mesh filename="meshes/link4.stl"/>
+        <mesh filename="link4.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <material name="White"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="meshes/link4.stl"/>
+        <mesh filename="link4.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </collision>
@@ -160,14 +166,14 @@
   <link name="link5">
     <visual>
       <geometry>
-        <mesh filename="meshes/link5.stl"/>
+        <mesh filename="link5.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <material name="White"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="meshes/link5.stl"/>
+        <mesh filename="link5.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </collision>
@@ -188,14 +194,14 @@
   <link name="link6">
     <visual>
       <geometry>
-        <mesh filename="meshes/link6.stl"/>
+        <mesh filename="link6.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <material name="Silver"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="meshes/link6.stl"/>
+        <mesh filename="link6.stl"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </collision>
@@ -229,7 +235,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/base_link.STL"/>
+        <mesh filename="base_link.STL"/>
       </geometry>
       <material name="Grey">
         <color rgba="0.2 0.2 0.2 1"/>
@@ -258,7 +264,7 @@
   <link name="link_0.0">
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_0.0.STL"/>
+        <mesh filename="link_0.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -290,7 +296,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_1.0.STL"/>
+        <mesh filename="link_1.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -337,7 +343,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_2.0.STL"/>
+        <mesh filename="link_2.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -384,7 +390,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_3.0.STL"/>
+        <mesh filename="link_3.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -394,11 +400,6 @@
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0.01"/>
     </collision>
-    <inertial>
-      <origin rpy="0 0 0" xyz="0 0 0.01335"/>
-      <mass value="0.02"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="2e-5" iyz="0.0" izz="2e-5"/>
-    </inertial>
   </link>
   <joint name="joint_3.0" type="revolute">
     <axis xyz="0 1 0"/>
@@ -411,7 +412,7 @@
     <visual>
       <origin rpy="0 0 1.570795" xyz="0 0 -0.020"/>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/modified_tip.STL" scale="0.001 0.001 0.001"/>
+        <mesh filename="modified_tip.STL" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="white"/>
     </visual>
@@ -455,7 +456,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_0.0.STL"/>
+        <mesh filename="link_0.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -482,7 +483,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_1.0.STL"/>
+        <mesh filename="link_1.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -529,7 +530,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_2.0.STL"/>
+        <mesh filename="link_2.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -574,14 +575,9 @@
       <inertia ixx="7.04217e-05" iyy="3.95744e-05" izz="6.61125e-05" ixy="-9.64342e-05" ixz="5.8796e-05"
                iyz="-3.62996e-05"/>
     </inertial>
-    <inertial>
-      <origin rpy="0 0 0" xyz="0 0 0.01335"/>
-      <mass value="0.02"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="2e-5" iyz="0.0" izz="2e-5"/>
-    </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_3.0.STL"/>
+        <mesh filename="link_3.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -603,7 +599,7 @@
     <visual>
       <origin rpy="0 0 1.570795" xyz="0 0 -0.020"/>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/modified_tip.STL" scale="0.001 0.001 0.001"/>
+        <mesh filename="modified_tip.STL" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="white"/>
     </visual>
@@ -647,7 +643,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_0.0.STL"/>
+        <mesh filename="link_0.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -674,7 +670,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_1.0.STL"/>
+        <mesh filename="link_1.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -721,7 +717,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_2.0.STL"/>
+        <mesh filename="link_2.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -766,14 +762,9 @@
       <inertia ixx="7.04217e-05" iyy="3.95744e-05" izz="6.61125e-05" ixy="-9.64342e-05" ixz="5.8796e-05"
                iyz="-3.62996e-05"/>
     </inertial>
-    <inertial>
-      <origin rpy="0 0 0" xyz="0 0 0.01335"/>
-      <mass value="0.02"/>
-      <inertia ixx="1e-5" ixy="0.0" ixz="0.0" iyy="2e-5" iyz="0.0" izz="2e-5"/>
-    </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_3.0.STL"/>
+        <mesh filename="link_3.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -795,7 +786,7 @@
     <visual>
       <origin rpy="0 0 1.570795" xyz="0 0 -0.020"/>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/modified_tip.STL" scale="0.001 0.001 0.001"/>
+        <mesh filename="modified_tip.STL" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="white"/>
     </visual>
@@ -841,9 +832,9 @@
     <visual>
       <geometry>
         <!-- RIGHT -->
-        <mesh filename="../allegro_hand_description/meshes/link_12.0_right.STL"/>
+        <mesh filename="link_12.0_right.STL"/>
         <!-- LEFT -->
-        <!-- <mesh filename="../allegro_hand_description/meshes/link_12.0_left.STL" /> -->
+        <!-- <mesh filename="link_12.0_left.STL" /> -->
       </geometry>
       <material name="black"/>
     </visual>
@@ -873,7 +864,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_13.0.STL"/>
+        <mesh filename="link_13.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -903,7 +894,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_14.0.STL"/>
+        <mesh filename="link_14.0.STL"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -950,7 +941,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/link_15.0.STL"/>
+        <mesh filename="link_15.0.STL"/>
       </geometry>
       <material name="black">
       </material>
@@ -993,7 +984,7 @@
     <visual>
       <origin rpy="0 0 1.570795" xyz="0 0 -0.020"/>
       <geometry>
-        <mesh filename="../allegro_hand_description/meshes/modified_tip.STL" scale="0.001 0.001 0.001"/>
+        <mesh filename="modified_tip.STL" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="white"/>
     </visual>
