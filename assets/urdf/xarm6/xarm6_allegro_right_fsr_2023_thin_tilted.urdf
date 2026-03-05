@@ -4,12 +4,12 @@
 <!-- |    EDITING THIS FILE BY HAND IS NOT RECOMMENDED                                 | -->
 <!-- =================================================================================== -->
 <robot name="xarm6">
-  <mujoco>
+  <!-- <mujoco>
         <compiler 
         meshdir="../meshes_mujoco/" 
         balanceinertia="true" 
         discardvisual="false" />
-  </mujoco>
+  </mujoco> -->
   <link name="world"/>
   <joint name="world_joint" type="fixed">
     <parent link="world"/>

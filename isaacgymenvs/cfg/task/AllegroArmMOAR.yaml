@@ -53,6 +53,8 @@ env:
   useInitRandomRotation: False
 
   force_debug: False
+  # Sim2sim: set to output dir (e.g. "runs") to record env0 joint targets to CSV (filename: env0_trajectory_YYYYMMDD_HHMMSS.csv)
+  recordEnv0TrajectoryCsv: null
   numTestEnvs: 16
   test:
     test_m_low: 0.1

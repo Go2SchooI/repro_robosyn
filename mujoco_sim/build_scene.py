@@ -157,7 +157,7 @@ def _save_and_patch_xml(model: mujoco.MjModel) -> str:
     option = root.find("option")
     if option is None:
         option = ET.SubElement(root, "option")
-    option.set("timestep", "0.008335")
+    option.set("timestep", "0.008335")  # Isaac physics_dt = sim.dt/substeps = 0.01667/2
     option.set("gravity", "0 0 -9.81")
     option.set("cone", "pyramidal")
     option.set("solver", "Newton")

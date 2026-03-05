@@ -26,6 +26,9 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import pickle
+import csv
+import atexit
+from datetime import datetime
 
 import numpy as np
 import os
@@ -141,6 +144,24 @@ class AllegroArmMOAR(VecTask):
         self.torque_control = self.cfg["env"].get("torqueControl", True)
         self.skill_step = self.cfg["env"].get("skill_step", 50)
         self.ignore_z = (self.object_type == "pen")
+
+        # Sim2sim: record env0 joint targets to CSV when testing (task.env.recordEnv0TrajectoryCsv=runs)
+        # CSV path is auto: {dir}/env0_trajectory_YYYYMMDD_HHMMSS.csv
+        record_dir = self.cfg["env"].get("recordEnv0TrajectoryCsv")
+        self._trajectory_csv_file = None
+        self._trajectory_csv_writer = None
+        self._trajectory_record_step = 0
+        self._trajectory_header_written = False
+        self._dof_names = None
+        if record_dir:
+            out_dir = record_dir if record_dir not in ("true", "1", "True") else "runs"
+            os.makedirs(out_dir, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            csv_path = os.path.join(out_dir, f"env0_trajectory_{timestamp}.csv")
+            self._trajectory_csv_file = open(csv_path, "w", newline="")
+            self._trajectory_csv_writer = csv.writer(self._trajectory_csv_file)
+            atexit.register(self._close_trajectory_csv)
+            print(f"[recordEnv0TrajectoryCsv] writing to {csv_path}")
 
         self.robot_asset_files_dict = {
             "thick": "urdf/xarm6/xarm6_allegro_right_fsr_2023_thin.urdf"
@@ -480,6 +501,16 @@ class AllegroArmMOAR(VecTask):
 
         return None
 
+    def _close_trajectory_csv(self):
+        """Close the env0 trajectory CSV file (called on exit when recordEnv0TrajectoryCsv is set)."""
+        if self._trajectory_csv_file is not None:
+            try:
+                self._trajectory_csv_file.close()
+            except Exception:
+                pass
+            self._trajectory_csv_file = None
+            self._trajectory_csv_writer = None
+
     def create_sim(self):
         self.dt = self.sim_params.dt
         self.up_axis_idx = 2 
@@ -812,6 +843,17 @@ class AllegroArmMOAR(VecTask):
 
         # override!
         self.hand_override_info = [(self.gym.find_actor_dof_handle(env_ptr, arm_hand_actor, finger_name), self.hand_qpos_init_override[finger_name]) for finger_name in self.hand_qpos_init_override]
+
+        # Build actual DOF name ordering for trajectory CSV header.
+        # Isaac Gym sorts branching children lexicographically, so hand DOF order
+        # is NOT simply joint_0..joint_15 — it's finger0, thumb, finger1, finger2.
+        if self._trajectory_csv_writer is not None:
+            dof_name_by_idx = {i: f"joint{i+1}" for i in range(6)}
+            for finger_name in self.hand_qpos_init_override:
+                idx = self.gym.find_actor_dof_handle(env_ptr, arm_hand_actor, finger_name)
+                dof_name_by_idx[idx] = finger_name
+            self._dof_names = [dof_name_by_idx[i] for i in range(self.num_arm_hand_dofs)]
+            print(f"[recordEnv0TrajectoryCsv] DOF order: {self._dof_names}")
 
         object_rb_props = self.gym.get_actor_rigid_body_properties(env_ptr, object_handle)
         self.object_rb_masses = [prop.mass for prop in object_rb_props]
@@ -1909,6 +1951,17 @@ class AllegroArmMOAR(VecTask):
             self.debug_target = torch.stack(self.debug_target, dim=0) # [control_steps, num_envs, 16]
 
         self.compute_reward(self.actions)
+
+        # Record env0 joint targets for sim2sim offline replay
+        if self._trajectory_csv_writer is not None and self.cur_targets is not None:
+            if not self._trajectory_header_written:
+                header = ["step"] + self._dof_names
+                self._trajectory_csv_writer.writerow(header)
+                self._trajectory_header_written = True
+            row = [self._trajectory_record_step] + self.cur_targets[0, :22].cpu().numpy().tolist()
+            self._trajectory_csv_writer.writerow(row)
+            self._trajectory_csv_file.flush()
+            self._trajectory_record_step += 1
 
         if not self.cfg["env"]["legacy_obs"]:
             if self.cfg["env"]["pc_mode"] == "cam":

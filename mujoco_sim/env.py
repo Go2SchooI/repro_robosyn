@@ -3,7 +3,7 @@
 Implements:
   - PD torque control (p=100, d=4, clip ±20Nm)
   - Relative control with action smoothing (scale=0.2, moving_average=0.8)
-  - 12 sub-steps per control step (control_freq_inv=12)
+  - 6 PD updates x 2 substeps per control step (match Isaac: control_freq_inv=6, substeps=2)
   - FSR contact sensing
 """
 
@@ -63,6 +63,7 @@ ALL_LOWER = np.concatenate([ARM_LOWER_LIMITS, HAND_LOWER_LIMITS])
 ALL_UPPER = np.concatenate([ARM_UPPER_LIMITS, HAND_UPPER_LIMITS])
 
 
+
 class BaodingMujocoEnv:
     """Single-environment MuJoCo wrapper for sim2sim inference."""
 
@@ -74,7 +75,8 @@ class BaodingMujocoEnv:
         torque_clip: float = 20.0,
         relative_scale: float = 0.2,
         act_moving_average: float = 0.8,
-        control_freq_inv: int = 12,
+        control_freq_inv: int = 6,
+        substeps: int = 2,
         render: bool = True,
     ):
         self.model = mujoco.MjModel.from_xml_path(xml_path)
@@ -86,7 +88,10 @@ class BaodingMujocoEnv:
         self.relative_scale = relative_scale
         self.act_moving_average = act_moving_average
         self.control_freq_inv = control_freq_inv
-        self.dt = self.model.opt.timestep
+        self.substeps = substeps
+        self.physics_dt = self.model.opt.timestep
+        # Isaac: self.dt = sim_params.dt = substeps * physics_dt, used for finite-diff velocity
+        self.dt = self.substeps * self.physics_dt
 
         self._resolve_indices()
 
@@ -190,8 +195,35 @@ class BaodingMujocoEnv:
         obs = self._get_obs()
         return obs
 
+    def _run_pd_loop(self, targets: np.ndarray):
+        """Inner PD control loop matching Isaac Gym's step structure.
+
+        Isaac does: for i in range(control_freq_inv=6):
+                        update_controller()     # PD with vel = (pos - prev) / dt
+                        gym.simulate()          # substeps=2 physics steps
+
+        Here we replicate: 6 PD updates, each followed by 2 mj_step calls.
+        self.dt = substeps * physics_dt = 0.01667 (used for finite-diff velocity, same as Isaac).
+        """
+        prev_qpos = self.data.qpos[self.all_qpos_idx].copy()
+        for _ in range(self.control_freq_inv):
+            cur_qpos = self.data.qpos[self.all_qpos_idx].copy()
+            dof_vel = (cur_qpos - prev_qpos) / self.dt
+
+            torques = self.p_gain * (targets - cur_qpos) - self.d_gain * dof_vel
+            torques = np.clip(torques, -self.torque_clip, self.torque_clip)
+
+            self.data.ctrl[self.hand_act_ids] = torques[6:]
+            prev_qpos = cur_qpos
+
+            for _ in range(self.substeps):
+                mujoco.mj_step(self.model, self.data)
+
+        if self.viewer is not None:
+            self.viewer.sync()
+
     def step(self, actions: np.ndarray) -> np.ndarray:
-        """Execute one control step (12 physics sub-steps with PD torque).
+        """Execute one control step (control_freq_inv PD updates × substeps physics steps).
 
         Args:
             actions: (22,) array in [-1, 1], from the policy network.
@@ -209,21 +241,27 @@ class BaodingMujocoEnv:
         self.prev_targets = targets.copy()
         self.last_actions = smoothed_actions.copy()
 
-        prev_qpos = self.data.qpos[self.all_qpos_idx].copy()
-        for _ in range(self.control_freq_inv):
-            cur_qpos = self.data.qpos[self.all_qpos_idx].copy()
-            dof_vel = (cur_qpos - prev_qpos) / self.dt
+        self._run_pd_loop(targets)
 
-            torques = self.p_gain * (targets - cur_qpos) - self.d_gain * dof_vel
-            torques = np.clip(torques, -self.torque_clip, self.torque_clip)
+        obs = self._get_obs()
+        return obs
 
-            self.data.ctrl[self.hand_act_ids] = torques[6:]
-            prev_qpos = cur_qpos
+    def step_from_targets(self, targets: np.ndarray) -> np.ndarray:
+        """Execute one control step using given joint targets (offline trajectory tracking).
 
-            mujoco.mj_step(self.model, self.data)
+        Args:
+            targets: (22,) array of desired positions (6 arm + 16 hand), in rad.
+                     Same order as CSV from Isaac Gym recordEnv0TrajectoryCsv.
 
-        if self.viewer is not None:
-            self.viewer.sync()
+        Returns:
+            obs: (366,) observation vector.
+        """
+        targets = np.asarray(targets, dtype=np.float64)
+        assert targets.shape == (22,), f"targets must be (22,), got {targets.shape}"
+        targets = np.clip(targets, ALL_LOWER, ALL_UPPER)
+        self.prev_targets = targets.copy()
+
+        self._run_pd_loop(targets)
 
         obs = self._get_obs()
         return obs
