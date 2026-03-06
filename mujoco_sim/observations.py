@@ -22,6 +22,10 @@ from mujoco_sim.utils import unscale, SPIN_AXIS_Z
 # Isaac hand DOF order: finger0 (0-3), thumb (12-15), finger1 (4-7), finger2 (8-11)
 ISAAC_HAND_ORDER = np.array([0, 1, 2, 3, 12, 13, 14, 15, 4, 5, 6, 7, 8, 9, 10, 11], dtype=np.intp)
 
+# Inverse: policy output is in Isaac order; when applying to prev_targets (MuJoCo order),
+# action_mujoco[6+j] = action_isaac[6 + MUJOCO_TO_ISAAC_ACTION[j]]
+MUJOCO_TO_ISAAC_ACTION = np.array([0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14, 15, 4, 5, 6, 7], dtype=np.intp)
+
 N_OBS_DIM = 85
 N_STACK = 4
 N_PRIV_PER_BALL = 13

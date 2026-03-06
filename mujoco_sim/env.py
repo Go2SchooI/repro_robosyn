@@ -15,7 +15,7 @@ from mujoco_sim.utils import (
     HAND_JOINT_NAMES, ARM_JOINT_NAMES, FSR_GEOM_NAMES,
     quat_wxyz_to_xyzw, unscale, scale,
 )
-from mujoco_sim.observations import ObservationBuilder
+from mujoco_sim.observations import ObservationBuilder, MUJOCO_TO_ISAAC_ACTION
 
 
 # Arm default positions (from the tilted URDF locked joints)
@@ -226,13 +226,19 @@ class BaodingMujocoEnv:
         """Execute one control step (control_freq_inv PD updates × substeps physics steps).
 
         Args:
-            actions: (22,) array in [-1, 1], from the policy network.
+            actions: (22,) array in [-1, 1], from the policy network (Isaac DOF order).
 
         Returns:
             obs: (366,) observation vector.
         """
+        # Policy was trained in Isaac; action is in Isaac hand order (finger0, thumb, finger1, finger2).
+        # prev_targets is in MuJoCo order (joint_0..15). Reorder action to MuJoCo before adding.
+        actions_mujoco = np.empty_like(actions)
+        actions_mujoco[:6] = actions[:6]
+        actions_mujoco[6:22] = actions[6:22][MUJOCO_TO_ISAAC_ACTION]
+
         smoothed_actions = (
-            actions * self.act_moving_average
+            actions_mujoco * self.act_moving_average
             + self.last_actions * (1.0 - self.act_moving_average)
         )
         targets = self.prev_targets + self.relative_scale * smoothed_actions

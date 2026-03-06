@@ -20,6 +20,8 @@ cd /home/jizexian/dexhand/in-hand-rotation/.mujoco/mujoco210/bin
 # MuJoCo 策略推理
 python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-02-23_14-41-32-83810/nn/last_baoding_ep_4200_rew_1296.3552.pth
 
+python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-02-23_14-41-32-83810/nn/last_baoding_ep_3500_rew_1232.517.pth
+
 # MuJoCo 离线轨迹跟踪（读 CSV，不加载策略，用于 sim2sim 环境一致性验证）
 # 注意：CSV 必须用修复后的 Isaac 代码录制（header 包含真实 DOF 名称），旧 CSV 的 header 有误不可用
 python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --trajectory-csv /home/jizexian/dexhand/in-hand-rotation/runs/env0_trajectory_20260306_022644.csv
@@ -33,6 +35,7 @@ python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --trajector
 # Obs 对齐说明（Gym vs MuJoCo）：
 # - 单帧 85 维：[0:6] 臂零, [6:22] 手关节(需与 Isaac 顺序一致), [22:29] 零, [29:45] 上一步 target 手, [45:61] FSR, [61:85] spin_axis×8
 # - 手顺序：MuJoCo 构建 obs 时已按 ISAAC_HAND_ORDER 重排 [6:22] 与 [29:45]，与 Gym 一致
+# - 策略推理：policy 输出 action 为 Isaac 顺序，step() 内用 MUJOCO_TO_ISAAC_ACTION 重排为 MuJoCo 顺序再与 prev_targets 相加
 # - FSR 顺序：两边 contact_sensor_names / FSR_GEOM_NAMES 相同，[45:61] 对齐
 # - 球 privileged：pos(3)+quat_xyzw(4)+linvel(3)+angvel*0.2(3)，quat 与 vel_obs_scale 已对齐
 
@@ -72,3 +75,33 @@ python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --trajector
 # 【差异小结】
 # - Isaac：连续力 → 每 env 随机阈值 [1,2] N 二值化 → 延迟(0.2) + 噪声(0.1) → obs
 # - MuJoCo：接触存在性二值，无阈值/延迟/噪声；若要做 sim2sim 一致，可在 MuJoCo 侧加类似阈值与（可选）延迟/噪声。
+
+# ---------- 观测计算代码位置（方便对照） ----------
+#
+# 【Isaac Gym】obs_type=full_stack_baoding 时
+#   - 入口：compute_observations() 约 1025 行 → 根据 obs_type 调 compute_contact_observations('fsbd')
+#   - 单帧 + 栈 + 球：compute_contact_observations(self, mode='fsbd')，约 1425–1511 行
+#     - last_obs_buf 单帧 85 维：1090–1135（unscale 手/臂、FSR、spin_axis、prev_targets、栈更新）
+#     - 接触处理（contact_tensor → sensed_contacts）：1456–1480
+#     - obj_buf 与 obs_buf 拼接：1508–1511
+#   - 数据来源：1028–1039 行 refresh 各类 tensor，object_pose/object_linvel/object_angvel 来自 root_state_tensor[object_indices]
+#   - 传感器顺序：contact_sensor_names 约 278 行；sensor_handle_indices 约 828 行
+#
+# 【MuJoCo】
+#   - 入口：env._get_obs()，mujoco_sim/env.py 约 269–299 行
+#   - 单帧 + 栈 + 球：mujoco_sim/observations.py
+#     - ObservationBuilder.build() 约 77–108 行（拼 frame 栈 + privileged）
+#     - _build_frame() 约 110–135 行（85 维：臂零、手重排、prev_target 重排、FSR、spin_axis）
+#     - _build_privileged() 约 137–146 行（两球各 13 维：pos, quat_xyzw, linvel, angvel*0.2）
+#   - FSR：env._get_fsr_contacts()，env.py 约 301–312 行
+#   - 手/球顺序常量：observations.py 的 ISAAC_HAND_ORDER、MUJOCO_TO_ISAAC_ACTION；utils.py 的 FSR_GEOM_NAMES
+
+# ---------- 对齐检查清单（任务仍失败时可逐项查） ----------
+# [x] 手关节 obs[6:22]、obs[29:45] 顺序 → ISAAC_HAND_ORDER 重排
+# [x] 策略 action 应用顺序 → step() 内 MUJOCO_TO_ISAAC_ACTION 重排
+# [x] 单帧 85 维布局、栈 4 帧、privileged 26 维 (13×2 球)
+# [x] 球 quat：MuJoCo wxyz→xyzw，vel_obs_scale=0.2
+# [x] FSR 传感器名称顺序一致
+# [ ] FSR 语义差异：Isaac 力阈值+延迟+噪声，MuJoCo 仅“是否接触”二值 → 可能导致策略在 MuJoCo 下看到不同 contact 分布
+# [ ] 初始状态：两球/手的 reset 位置、spin_axis 是否与 Isaac 一致
+# [ ] 物理/控制：PD 增益、substeps、control_freq_inv、关节限位、摩擦等
