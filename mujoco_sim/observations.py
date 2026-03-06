@@ -5,6 +5,12 @@ the Isaac Gym environment exactly:
   - 85 dims per frame x 4 stacked frames = 340 dims
   - 13 dims x 2 balls privileged info = 26 dims
   Total = 366 dims
+
+Hand joint order alignment:
+  Isaac Gym orders hand DOFs by URDF child name sort: finger0, thumb, finger1, finger2
+  → obs[6:22] = [joint_0..3, joint_12..15, joint_4..7, joint_8..11]
+  MuJoCo uses HAND_JOINT_NAMES = joint_0..15. We reorder to match Isaac so the
+  same obs indices mean the same physical joint for the policy.
 """
 
 import numpy as np
@@ -12,6 +18,9 @@ from typing import List
 
 from mujoco_sim.utils import unscale, SPIN_AXIS_Z
 
+# Index permutation: MuJoCo hand_qpos[ISAAC_HAND_ORDER[k]] = Isaac obs[6+k]
+# Isaac hand DOF order: finger0 (0-3), thumb (12-15), finger1 (4-7), finger2 (8-11)
+ISAAC_HAND_ORDER = np.array([0, 1, 2, 3, 12, 13, 14, 15, 4, 5, 6, 7, 8, 9, 10, 11], dtype=np.intp)
 
 N_OBS_DIM = 85
 N_STACK = 4
@@ -108,12 +117,13 @@ class ObservationBuilder:
         all_qpos[6:22] = hand_qpos
         scaled_qpos = unscale(all_qpos, self.all_lower, self.all_upper)
         frame[0:6] = 0.0
-        frame[6:22] = scaled_qpos[6:22]
+        # Reorder hand to Isaac DOF order (finger0, thumb, finger1, finger2)
+        frame[6:22] = scaled_qpos[6:22][ISAAC_HAND_ORDER]
 
         frame[22:29] = 0.0
 
         scaled_targets = unscale(prev_targets, self.all_lower, self.all_upper)
-        frame[29:45] = scaled_targets[6:22]
+        frame[29:45] = scaled_targets[6:22][ISAAC_HAND_ORDER]
 
         frame[45:61] = fsr_contacts[:16]
 
