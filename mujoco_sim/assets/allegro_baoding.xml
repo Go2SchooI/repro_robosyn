@@ -222,7 +222,7 @@
         </body>
 
         
-        <body name="ball1" pos="0.63 0.01 0.25">
+        <body name="ball1" pos="0.63 0.015 0.25">
             <freejoint name="ball1_joint" />
             <geom name="ball1_visual" type="sphere" size="0.022" rgba="0.9 0.3 0.3 1" contype="0" conaffinity="0" group="1" />
             <geom name="ball1_collision" type="sphere" size="0.022" mass="0.25" condim="4" friction="1.0 0.005 0.001" />
@@ -235,6 +235,25 @@
             <geom name="ball2_collision" type="sphere" size="0.022" mass="0.25" condim="4" friction="1.0 0.005 0.001" />
         </body>
     </worldbody>
+
+    <!-- 含 FSR 的 link：body 自排除，禁止该 body 内任意两 geom 碰撞（含 FSR 与同 link 的 mesh/box），避免 FSR 与所在 link 自接触误触发 -->
+    <contact>
+        <exclude body1="link_0.0" body2="link_0.0" />
+        <exclude body1="link_1.0" body2="link_1.0" />
+        <exclude body1="link_2.0" body2="link_2.0" />
+        <exclude body1="link_3.0" body2="link_3.0" />
+        <exclude body1="link_4.0" body2="link_4.0" />
+        <exclude body1="link_5.0" body2="link_5.0" />
+        <exclude body1="link_6.0" body2="link_6.0" />
+        <exclude body1="link_7.0" body2="link_7.0" />
+        <exclude body1="link_8.0" body2="link_8.0" />
+        <exclude body1="link_9.0" body2="link_9.0" />
+        <exclude body1="link_10.0" body2="link_10.0" />
+        <exclude body1="link_11.0" body2="link_11.0" />
+        <exclude body1="link_13.0" body2="link_13.0" />
+        <exclude body1="link_14.0" body2="link_14.0" />
+        <exclude body1="link_15.0" body2="link_15.0" />
+    </contact>
 
     
     <actuator>

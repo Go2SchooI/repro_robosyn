@@ -44,12 +44,16 @@ env:
   episodeLength: 500
   enableDebugVis: False
   aggregateMode: 1
-  sensorThresh: 1.0
-  sensorNoise: 0.1
+  # 触觉/接触相关：域随机化与观测处理
+  sensorThresh: 1.0   # 每 reset 随机 contact_thresh 在 [1.0, 1.0+sensorThresh]，用于二值化 FSR
+  sensorNoise: 0.1    # 触觉信号以该概率被置 0（mask）
   obs_stack: 4
-  latency: 0.2
-  m_low: 0.2 
-  m_up: 0.6 
+  latency: 0.0       # 以该概率保留上一帧触觉（延迟一帧）
+  m_low: 0.1
+  m_up: 0.4
+  # Contact friction (hand + object): random in [frictionLower, frictionUpper] at env create and each reset
+  frictionLower: 0.2
+  frictionUpper: 3.0
   useInitRandomRotation: False
 
   force_debug: False
@@ -137,7 +141,7 @@ task:
         color: False
         dof_properties:
           stiffness:
-            range: [0.75, 1.5]
+            range: [0.7, 1.5]
             operation: "scaling"
             distribution: "loguniform"
           lower:

@@ -1,8 +1,8 @@
 # 仅 test（不录轨迹）
-bash scripts/teacher_baoding.sh 0 test=True checkpoint=/home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-02-23_01-48-25-83810/nn/last_baoding_ep_2700_rew_1187.106.pth headless=False task.env.numEnvs=16
+bash scripts/teacher_baoding.sh 0 test=True checkpoint=/home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-07_18-09-49-83810/nn/last_baoding_ep_1400_rew_1196.1826.pth headless=False task.env.numEnvs=16
 
 # Test + 记录 env0 灵巧手关节期望到 CSV（文件名按时间生成：runs/env0_trajectory_YYYYMMDD_HHMMSS.csv）
-bash scripts/teacher_baoding.sh 0 test=True checkpoint=/home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-02-23_14-41-32-83810/nn/last_baoding_ep_4200_rew_1296.3552.pth headless=False task.env.numEnvs=16 task.env.recordEnv0TrajectoryCsv=runs
+bash scripts/teacher_baoding.sh 0 test=True checkpoint=/home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-07_18-09-49-83810/nn/last_baoding_ep_1400_rew_1196.1826.pth headless=False task.env.numEnvs=16 task.env.recordEnv0TrajectoryCsv=runs
 
 mkdir -p /home/jizexian/dexhand/in-hand-rotation/.mujoco
 
@@ -20,7 +20,7 @@ cd /home/jizexian/dexhand/in-hand-rotation/.mujoco/mujoco210/bin
 # MuJoCo 策略推理
 python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-02-23_14-41-32-83810/nn/last_baoding_ep_4200_rew_1296.3552.pth
 
-python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-02-23_14-41-32-83810/nn/last_baoding_ep_3500_rew_1232.517.pth
+python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-08_00-55-05-83810/nn/last_baoding_ep_800_rew_1218.9548.pth
 
 # MuJoCo 离线轨迹跟踪（读 CSV，不加载策略，用于 sim2sim 环境一致性验证）
 # 注意：CSV 必须用修复后的 Isaac 代码录制（header 包含真实 DOF 名称），旧 CSV 的 header 有误不可用
@@ -105,3 +105,45 @@ python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --trajector
 # [ ] FSR 语义差异：Isaac 力阈值+延迟+噪声，MuJoCo 仅“是否接触”二值 → 可能导致策略在 MuJoCo 下看到不同 contact 分布
 # [ ] 初始状态：两球/手的 reset 位置、spin_axis 是否与 Isaac 一致
 # [ ] 物理/控制：PD 增益、substeps、control_freq_inv、关节限位、摩擦等
+
+# ---------- API 手册调研：两边变量与坐标系是否对齐（仅调研，未改代码） ----------
+#
+# 一、Isaac Gym（来源：Tensor API 文档 + PhysX 文档 + 社区）
+#
+# 1. Actor Root State Tensor (root_state_tensor / object_pose 等)
+#    - 布局：13 float/actor → pos(3), quat(4), linvel(3), angvel(3)
+#    - 坐标系：均为世界系（world frame）。位置、朝向、线速度、角速度均在世界坐标系下。
+#    - 四元数顺序：PhysX 使用 (x, y, z, w)；Isaac 暴露的 root_state_tensor [3:7] 与 PhysX 一致，即 xyzw。
+#    - 文档依据：Tensor API 页 “same layout as GymRigidBodyState”；社区/检索结果明确 position/velocity 为 world frame。
+#
+# 2. Net Contact Force Tensor (contact_tensor → FSR 观测)
+#    - 含义：每个 rigid body 上受到的净接触力（3D 向量）。
+#    - 坐标系：文档写明 “Contact forces are measured in the **world frame**”。
+#    - 注意：与 mesh 碰撞时存在已知的报告不准问题；contact_collection 与 substeps 会影响数值。
+#
+# 3. DOF State (关节位置/速度)
+#    - 关节位置：弧度（revolute）或米（prismatic）；顺序与 get_actor_dof_states 一致，按 asset 的 DOF 顺序。
+#    - 关节速度：弧度/秒或米/秒；与 DOF 顺序一致。未在文档中写明“相对哪一坐标系”，对 revolute 而言通常就是关节角速度标量。
+#
+# 二、MuJoCo（来源：API Reference + 论坛 + 检索）
+#
+# 1. Free joint（球体等）qpos / qvel (mjData)
+#    - qpos（7）：pos(3) 世界系位置；quat(4) 世界系朝向，格式为 **(w, x, y, z)**，与 Isaac 的 xyzw 不同。
+#    - qvel（6）：前 3 为线速度（世界系），后 3 为角速度（世界系）。与 Isaac 一致均为世界系。
+#    - 结论：位置、线速度、角速度两边都是世界系；仅四元数存储顺序不同，需在 MuJoCo→obs 时做 wxyz→xyzw 转换（当前 utils 已做）。
+#
+# 2. 接触 (data.contact)
+#    - 无“每 body 合力”接口；只有接触对列表 (geom1, geom2, …)。当前 MuJoCo 侧用“某 FSR geom 是否出现在任意 contact 对”做二值，与 Isaac 的“世界系合力→标量→阈值”在语义与数值上均不完全一致。
+#
+# 三、对齐结论摘要
+#
+# - 位置 (pos)：两边均为世界系 → 对齐。
+# - 四元数 (quat)：Isaac xyzw，MuJoCo wxyz；obs 中已统一为 xyzw（MuJoCo 侧转换）→ 对齐。
+# - 线速度 (linvel)：两边均为世界系 → 对齐。
+# - 角速度 (angvel)：两边均为世界系 → 对齐。
+# - 接触力 (FSR)：Isaac 为世界系 3D 力→标量→阈值/延迟/噪声；MuJoCo 为“是否接触”二值，无坐标系问题但语义与数值不一致。
+# - 关节 DOF：顺序已在别处通过 ISAAC_HAND_ORDER / CSV header 等处理；单位与含义一致（弧度/弧度每秒）。
+#
+# 四、建议
+#
+# - 若任务仍失败，可重点排查：① FSR 语义差异（力 vs 存在性、阈值/延迟/噪声）；② 初始状态与 spin_axis；③ 物理/控制参数；④ 两边重力/up 轴是否一致（均为 Z-up 则无问题）。

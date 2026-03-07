@@ -235,7 +235,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="base_link.STL"/>
+        <mesh filename="base_link.obj"/>
       </geometry>
       <material name="Grey">
         <color rgba="0.2 0.2 0.2 1"/>
@@ -264,7 +264,7 @@
   <link name="link_0.0">
     <visual>
       <geometry>
-        <mesh filename="link_0.0.STL"/>
+        <mesh filename="link_0.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -296,7 +296,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_1.0.STL"/>
+        <mesh filename="link_1.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -343,7 +343,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_2.0.STL"/>
+        <mesh filename="link_2.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -390,7 +390,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_3.0.STL"/>
+        <mesh filename="link_3.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -412,7 +412,7 @@
     <visual>
       <origin rpy="0 0 1.570795" xyz="0 0 -0.020"/>
       <geometry>
-        <mesh filename="modified_tip.STL" scale="0.001 0.001 0.001"/>
+        <mesh filename="modified_tip.obj" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="white"/>
     </visual>
@@ -456,7 +456,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_0.0.STL"/>
+        <mesh filename="link_0.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -483,7 +483,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_1.0.STL"/>
+        <mesh filename="link_1.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -530,7 +530,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_2.0.STL"/>
+        <mesh filename="link_2.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -577,7 +577,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_3.0.STL"/>
+        <mesh filename="link_3.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -599,7 +599,7 @@
     <visual>
       <origin rpy="0 0 1.570795" xyz="0 0 -0.020"/>
       <geometry>
-        <mesh filename="modified_tip.STL" scale="0.001 0.001 0.001"/>
+        <mesh filename="modified_tip.obj" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="white"/>
     </visual>
@@ -643,7 +643,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_0.0.STL"/>
+        <mesh filename="link_0.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -670,7 +670,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_1.0.STL"/>
+        <mesh filename="link_1.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -717,7 +717,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_2.0.STL"/>
+        <mesh filename="link_2.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -764,7 +764,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_3.0.STL"/>
+        <mesh filename="link_3.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -786,7 +786,7 @@
     <visual>
       <origin rpy="0 0 1.570795" xyz="0 0 -0.020"/>
       <geometry>
-        <mesh filename="modified_tip.STL" scale="0.001 0.001 0.001"/>
+        <mesh filename="modified_tip.obj" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="white"/>
     </visual>
@@ -832,7 +832,7 @@
     <visual>
       <geometry>
         <!-- RIGHT -->
-        <mesh filename="link_12.0_right.STL"/>
+        <mesh filename="link_12.0_right.obj"/>
         <!-- LEFT -->
         <!-- <mesh filename="link_12.0_left.STL" /> -->
       </geometry>
@@ -864,7 +864,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_13.0.STL"/>
+        <mesh filename="link_13.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -894,7 +894,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_14.0.STL"/>
+        <mesh filename="link_14.0.obj"/>
       </geometry>
       <material name="black"/>
     </visual>
@@ -941,7 +941,7 @@
     </inertial>
     <visual>
       <geometry>
-        <mesh filename="link_15.0.STL"/>
+        <mesh filename="link_15.0.obj"/>
       </geometry>
       <material name="black">
       </material>
@@ -984,7 +984,7 @@
     <visual>
       <origin rpy="0 0 1.570795" xyz="0 0 -0.020"/>
       <geometry>
-        <mesh filename="modified_tip.STL" scale="0.001 0.001 0.001"/>
+        <mesh filename="modified_tip.obj" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="white"/>
     </visual>

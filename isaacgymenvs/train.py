@@ -83,7 +83,7 @@ def launch_rlg_hydra(cfg: DictConfig):
     cfg.seed += rank
     cfg.seed = set_seed(cfg.seed, torch_deterministic=cfg.torch_deterministic, rank=rank)
 
-    if cfg.wandb_activate and rank == 0:
+    if cfg.wandb_activate and rank == 0 and not cfg.test:
         # Make sure to install WandB if you actually use this.
         import wandb
 
@@ -164,12 +164,13 @@ def launch_rlg_hydra(cfg: DictConfig):
 
     # dump config dict
 
-    experiment_dir = os.path.join('runs', cfg.train.params.config.name)
-    experiment_dir = os.path.join(experiment_dir, prefix)
+    if not cfg.test:
+        experiment_dir = os.path.join('runs', cfg.train.params.config.name)
+        experiment_dir = os.path.join(experiment_dir, prefix)
 
-    os.makedirs(experiment_dir, exist_ok=True)
-    with open(os.path.join(experiment_dir, 'config.yaml'), 'w') as f:
-        f.write(OmegaConf.to_yaml(cfg))
+        os.makedirs(experiment_dir, exist_ok=True)
+        with open(os.path.join(experiment_dir, 'config.yaml'), 'w') as f:
+            f.write(OmegaConf.to_yaml(cfg))
 
     runner.run({
         'train': not cfg.test,
@@ -178,7 +179,7 @@ def launch_rlg_hydra(cfg: DictConfig):
         'sigma' : None
     })
 
-    if cfg.wandb_activate and rank == 0:
+    if cfg.wandb_activate and rank == 0 and not cfg.test:
         wandb.finish()
 
 if __name__ == "__main__":

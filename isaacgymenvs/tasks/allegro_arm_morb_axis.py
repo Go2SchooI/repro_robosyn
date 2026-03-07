@@ -100,8 +100,8 @@ class AllegroArmMOAR(VecTask):
         self.force_decay_interval = self.cfg["env"].get("forceDecayInterval", 0.08)
         self.rotation_axis = self.cfg["env"]["axis"]
 
-        self.randomize_friction_lower = 0.2
-        self.randomize_friction_upper = 3.0
+        self.randomize_friction_lower = self.cfg["env"].get("frictionLower", 0.2)
+        self.randomize_friction_upper = self.cfg["env"].get("frictionUpper", 3.0)
         self.randomize_mass_lower = self.m_lower
         self.randomize_mass_upper = self.m_upper
 
