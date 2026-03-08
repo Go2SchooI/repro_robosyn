@@ -32,7 +32,7 @@ HAND_JOINT_NAMES = [
 ARM_JOINT_NAMES = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
 
 BALL1_INIT_POS = "0.63 0.01 0.25"
-BALL2_INIT_POS = "0.63 -0.02 0.25"
+BALL2_INIT_POS = "0.63 -0.015 0.25"
 
 
 def _clean_urdf(urdf_text: str, urdf_dir: str) -> str:

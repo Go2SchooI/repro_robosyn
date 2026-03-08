@@ -66,6 +66,7 @@ class AllegroArmMOAR(VecTask):
     def __init__(self, cfg, rl_device, sim_device, graphics_device_id, headless, virtual_screen_capture, force_render):
         self.training = True
         self.cfg = cfg
+        self.is_test = self.cfg.get("test", False)
         self.object_size = self.cfg["env"]["objectSize"]
         self.randomize = self.cfg["task"]["randomize"]
         self.randomization_params = self.cfg["task"]["randomization_params"]
@@ -210,7 +211,7 @@ class AllegroArmMOAR(VecTask):
                 "new": (0.66, 0.01, 0.238), 
             }
         elif self.object_set_id == "ball":
-            self.obj_init_pos_shift = {"new": [(0.63, 0.01, 0.25), (0.63, -0.02, 0.25)]}
+            self.obj_init_pos_shift = {"new": [(0.63, 0.015, 0.25), (0.63, -0.015, 0.25)]}
         else:
             self.obj_init_pos_shift = {
                 "org": (0.56, 0.0, 0.36),
@@ -484,6 +485,17 @@ class AllegroArmMOAR(VecTask):
         self.debug_qpos = []
 
         self.post_init()
+        if self.obs_type in ("full_stack_baoding", "partial_stack_baoding"):
+            self._sync_all_envs_to_reset_state()
+            # Pre-compute observations so that env.reset() returns real data
+            # instead of zeros. Without this, the policy's first action (derived
+            # from zero obs + RunningMeanStd normalization) is often bad enough
+            # to drop the balls within a few steps.
+            self.actions = torch.zeros_like(self.last_actions)
+            all_env_ids = list(range(self.num_envs))
+            self.reset_spin_axis(all_env_ids)
+            self.contact_thresh[:] = torch.rand_like(self.contact_thresh) * self.sensor_thresh + 1.0
+            self.compute_observations()
 
     def get_internal_state(self):
         return self.root_state_tensor[self.object_indices, 3:7]
@@ -520,6 +532,38 @@ class AllegroArmMOAR(VecTask):
 
         self._create_ground_plane()
         self._create_envs(self.num_envs, self.cfg["env"]['envSpacing'], int(np.sqrt(self.num_envs)))
+
+    def _sync_all_envs_to_reset_state(self):
+        """让所有 env 创建后即与 reset 后状态一致（手/臂关节 + 目标）；test 时 env0 双球再设为固定 keyframe。"""
+        env_ids = torch.arange(self.num_envs, device=self.device)
+        self.arm_hand_dof_pos[:] = self.arm_hand_dof_default_pos
+        self.arm_hand_dof_vel[:] = self.arm_hand_dof_default_vel
+        self.prev_targets[:, :self.num_arm_hand_dofs] = self.arm_hand_dof_default_pos
+        self.cur_targets[:, :self.num_arm_hand_dofs] = self.arm_hand_dof_default_pos
+        for env_id in env_ids.tolist():
+            for (idx, qpos) in self.hand_override_info:
+                self.dof_state[env_id * self.num_arm_hand_dofs + idx, 0] = qpos
+        hand_indices = self.hand_indices.to(torch.int32)
+        self.gym.set_dof_position_target_tensor_indexed(self.sim,
+                                                        gymtorch.unwrap_tensor(self.prev_targets),
+                                                        gymtorch.unwrap_tensor(hand_indices), len(env_ids))
+        self.gym.set_dof_state_tensor_indexed(self.sim,
+                                              gymtorch.unwrap_tensor(self.dof_state),
+                                              gymtorch.unwrap_tensor(hand_indices), len(env_ids))
+        if self.is_test and self.object_set_id == "ball":
+            self.root_state_tensor[self.object_indices[0, 0], 0:3] = to_torch([0.63, 0.015, 0.25], device=self.device)
+            self.root_state_tensor[self.object_indices[0, 0], 3:7] = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device)
+            self.root_state_tensor[self.object_indices[0, 0], 7:13] = 0.0
+            self.root_state_tensor[self.object_indices[0, 1], 0:3] = to_torch([0.63, -0.015, 0.25], device=self.device)
+            self.root_state_tensor[self.object_indices[0, 1], 3:7] = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device)
+            self.root_state_tensor[self.object_indices[0, 1], 7:13] = 0.0
+            object_indices = torch.unique(torch.cat([self.object_indices[0:1]], dim=-1).to(torch.int32))
+            self.gym.set_actor_root_state_tensor_indexed(self.sim,
+                                                         gymtorch.unwrap_tensor(self.root_state_tensor),
+                                                         gymtorch.unwrap_tensor(object_indices), len(object_indices))
+        # 推完状态后刷新，保证 Python 端 tensor 与 sim 一致
+        self.gym.refresh_dof_state_tensor(self.sim)
+        self.gym.refresh_actor_root_state_tensor(self.sim)
 
     def _create_ground_plane(self):
         plane_params = gymapi.PlaneParams()
@@ -727,15 +771,26 @@ class AllegroArmMOAR(VecTask):
                 object_start_pose.r = gymapi.Quat(0, 0, np.cos(init_theta), np.sin(init_theta))
 
             if self.object_set_id == "ball":
-                init_theta = random.uniform(-np.pi, np.pi)
-                center_pos = (0.63, 0., 0.25)  
-                radius = 0.015
-
-                object_start_pose[0].p.x = arm_hand_start_pose.p.x + (center_pos[0] + radius * np.cos(init_theta))
-                object_start_pose[0].p.y = arm_hand_start_pose.p.y + (center_pos[1] + radius * np.sin(init_theta))
-                
-                object_start_pose[0].p.x = arm_hand_start_pose.p.x + (center_pos[0] - radius * np.cos(init_theta))
-                object_start_pose[0].p.y = arm_hand_start_pose.p.y + (center_pos[1] - radius * np.sin(init_theta))
+                # test + env0: use fixed MuJoCo keyframe so first step does not drop (reset_idx only runs after first step)
+                if self.is_test and i == 0:
+                    object_start_pose[0].p.x = arm_hand_start_pose.p.x + 0.63
+                    object_start_pose[0].p.y = arm_hand_start_pose.p.y + 0.015
+                    object_start_pose[0].p.z = arm_hand_start_pose.p.z + 0.25
+                    object_start_pose[0].r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+                    object_start_pose[1].p.x = arm_hand_start_pose.p.x + 0.63
+                    object_start_pose[1].p.y = arm_hand_start_pose.p.y + (-0.015)
+                    object_start_pose[1].p.z = arm_hand_start_pose.p.z + 0.25
+                    object_start_pose[1].r = gymapi.Quat(0.0, 0.0, 0.0, 1.0)
+                else:
+                    init_theta = random.uniform(-np.pi, np.pi)
+                    center_pos = (0.63, 0.0, 0.25)
+                    radius = 0.015
+                    object_start_pose[0].p.x = arm_hand_start_pose.p.x + (center_pos[0] + radius * np.cos(init_theta))
+                    object_start_pose[0].p.y = arm_hand_start_pose.p.y + (center_pos[1] + radius * np.sin(init_theta))
+                    object_start_pose[0].p.z = arm_hand_start_pose.p.z + center_pos[2]
+                    object_start_pose[1].p.x = arm_hand_start_pose.p.x + (center_pos[0] - radius * np.cos(init_theta))
+                    object_start_pose[1].p.y = arm_hand_start_pose.p.y + (center_pos[1] - radius * np.sin(init_theta))
+                    object_start_pose[1].p.z = arm_hand_start_pose.p.z + center_pos[2]
 
             if self.obs_type == "full_stack_baoding" or self.obs_type == "partial_stack_baoding":
                 object_handle_tmp = []
@@ -1828,6 +1883,21 @@ class AllegroArmMOAR(VecTask):
             self.root_state_tensor[self.object_indices[env_ids], 3:7] = new_object_rot.clone()
         self.root_state_tensor[self.object_indices[env_ids], 7:13] = torch.zeros_like(self.root_state_tensor[self.object_indices[env_ids], 7:13])
 
+        # test + env0: fix double-ball init to match MuJoCo keyframe (0.63, 0.015, 0.25) and (0.63, -0.015, 0.25)
+        if (
+            self.obs_type in ("full_stack_baoding", "partial_stack_baoding")
+            and self.object_set_id == "ball"
+            and self.is_test
+            and (env_ids == 0).any()
+        ):
+            # ball1: (0.63, 0.015, 0.25), ball2: (0.63, -0.015, 0.25), identity quat (xyzw), zero vel
+            self.root_state_tensor[self.object_indices[0, 0], 0:3] = to_torch([0.63, 0.015, 0.25], device=self.device)
+            self.root_state_tensor[self.object_indices[0, 0], 3:7] = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device)
+            self.root_state_tensor[self.object_indices[0, 0], 7:13] = 0.0
+            self.root_state_tensor[self.object_indices[0, 1], 0:3] = to_torch([0.63, -0.015, 0.25], device=self.device)
+            self.root_state_tensor[self.object_indices[0, 1], 3:7] = to_torch([0.0, 0.0, 0.0, 1.0], device=self.device)
+            self.root_state_tensor[self.object_indices[0, 1], 7:13] = 0.0
+
         if self.obs_type == "full_stack_baoding" or self.obs_type == "partial_stack_baoding":
             object_indices = torch.unique(torch.cat([self.object_indices[env_ids]], dim=-1).to(torch.int32))
         else:
@@ -1851,7 +1921,7 @@ class AllegroArmMOAR(VecTask):
         self.arm_hand_dof_pos[env_ids, :] = self.arm_hand_dof_default_pos
         self.arm_hand_dof_vel[env_ids, :] = self.arm_hand_dof_default_vel 
         self.prev_targets[env_ids, :self.num_arm_hand_dofs] = self.arm_hand_dof_default_pos
-        self.cur_targets[env_ids, :self.num_arm_hand_dofs] = self.arm_hand_dof_default_vel
+        self.cur_targets[env_ids, :self.num_arm_hand_dofs] = self.arm_hand_dof_default_pos
 
         hand_indices = self.hand_indices[env_ids].to(torch.int32)
 

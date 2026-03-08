@@ -55,6 +55,8 @@ def make(
     # reuse existing config
     else:
         cfg_dict = omegaconf_to_dict(cfg.task)
+        # pass top-level test flag so task can e.g. fix env0 init to match MuJoCo keyframe
+        cfg_dict['test'] = OmegaConf.select(cfg, 'test', default=False)
 
     #print("CFG_DICT", cfg_dict)
     update_dict = kwargs.get('override', {})
