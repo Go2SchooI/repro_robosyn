@@ -8,7 +8,7 @@ Usage (policy inference):
 Usage (offline trajectory replay from Isaac Gym env0 CSV):
     python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml \\
                              --trajectory-csv /path/to/env0_trajectory.csv \\
-                             [--no-render] [--slow 1.0]
+                             [--no-render] [--slow 5]
 """
 
 import argparse
@@ -69,7 +69,7 @@ def run_offline_trajectory(
     xml_path: str,
     trajectory_path: str,
     render: bool = True,
-    slow_factor: float = 1.0,
+    slow_factor: float = 5.0,
 ):
     """Run MuJoCo with joint targets from a CSV (no policy)."""
     print("=" * 60)
@@ -116,7 +116,7 @@ def run(
     render: bool = True,
     max_steps: int = 3000,
     device: str = "cpu",
-    slow_factor: float = 1.0,
+    slow_factor: float = 5.0,
 ):
     print("=" * 60)
     print("  Allegro Baoding Sim2Sim: Isaac Gym -> MuJoCo")
@@ -151,7 +151,7 @@ def run(
                 f"Hand qpos range: [{hand_qpos.min():.3f}, {hand_qpos.max():.3f}]"
             )
 
-        if ball1_pos[2] < 0.05 and ball2_pos[2] < 0.05:
+        if ball1_pos[2] < 0.05 or ball2_pos[2] < 0.05:
             print(f"  Both balls dropped at step {step}. Resetting...")
             obs = env.reset()
 
@@ -172,7 +172,8 @@ def main():
     parser.add_argument("--trajectory-csv", help="Path to CSV of env0 joint targets from Isaac Gym (offline replay)")
     parser.add_argument("--no-render", action="store_true", help="Disable viewer")
     parser.add_argument("--steps", type=int, default=3000, help="Max inference steps (policy mode only)")
-    parser.add_argument("--slow", type=float, default=1.0, help="Playback slowdown factor (e.g. 5 = 5x slower)")
+    parser.add_argument("--slow", type=float, default=5.0,
+                        help="Playback slowdown factor: 1=realtime, 5=5x slower (default: 5)")
     parser.add_argument("--device", default="cpu", help="Torch device (policy mode only)")
     args = parser.parse_args()
 

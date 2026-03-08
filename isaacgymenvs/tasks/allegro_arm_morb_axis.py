@@ -152,6 +152,7 @@ class AllegroArmMOAR(VecTask):
         self._trajectory_csv_writer = None
         self._trajectory_record_step = 0
         self._trajectory_header_written = False
+        self._trajectory_after_first_reset = False  # only record after env0 has reset once (skip failed first run)
         self._dof_names = None
         if record_dir:
             out_dir = record_dir if record_dir not in ("true", "1", "True") else "runs"
@@ -1952,16 +1953,19 @@ class AllegroArmMOAR(VecTask):
 
         self.compute_reward(self.actions)
 
-        # Record env0 joint targets for sim2sim offline replay
+        # Record env0 joint targets for sim2sim offline replay (only after env0 has reset once, skip failed first run)
         if self._trajectory_csv_writer is not None and self.cur_targets is not None:
-            if not self._trajectory_header_written:
-                header = ["step"] + self._dof_names
-                self._trajectory_csv_writer.writerow(header)
-                self._trajectory_header_written = True
-            row = [self._trajectory_record_step] + self.cur_targets[0, :22].cpu().numpy().tolist()
-            self._trajectory_csv_writer.writerow(row)
-            self._trajectory_csv_file.flush()
-            self._trajectory_record_step += 1
+            if self.reset_buf[0].item():
+                self._trajectory_after_first_reset = True
+            if self._trajectory_after_first_reset:
+                if not self._trajectory_header_written:
+                    header = ["step"] + self._dof_names
+                    self._trajectory_csv_writer.writerow(header)
+                    self._trajectory_header_written = True
+                row = [self._trajectory_record_step] + self.cur_targets[0, :22].cpu().numpy().tolist()
+                self._trajectory_csv_writer.writerow(row)
+                self._trajectory_csv_file.flush()
+                self._trajectory_record_step += 1
 
         if not self.cfg["env"]["legacy_obs"]:
             if self.cfg["env"]["pc_mode"] == "cam":

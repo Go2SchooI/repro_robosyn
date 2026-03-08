@@ -78,6 +78,7 @@ class BaodingMujocoEnv:
         control_freq_inv: int = 6,
         substeps: int = 2,
         render: bool = True,
+        fsr_force_threshold: float = 1.0,
     ):
         self.model = mujoco.MjModel.from_xml_path(xml_path)
         self.data = mujoco.MjData(self.model)
@@ -92,6 +93,8 @@ class BaodingMujocoEnv:
         self.physics_dt = self.model.opt.timestep
         # Isaac: self.dt = sim_params.dt = substeps * physics_dt, used for finite-diff velocity
         self.dt = self.substeps * self.physics_dt
+        # Isaac: contact_tensor per-body force -> norm -> threshold in [1.0, 1.0+sensorThresh]; we use fixed threshold
+        self.fsr_force_threshold = fsr_force_threshold
 
         self._resolve_indices()
 
@@ -165,13 +168,16 @@ class BaodingMujocoEnv:
             self.ball_qvel_idx.append(np.arange(va, va + 6))  # linvel(3) + angvel(3)
 
         self.fsr_geom_ids = []
+        self.fsr_body_ids = []  # body id for each FSR (for force-based contact, align with Isaac)
         for gname in FSR_GEOM_NAMES:
             gid = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, gname)
             if gid >= 0:
                 self.fsr_geom_ids.append(gid)
+                self.fsr_body_ids.append(self.model.geom_bodyid[gid])
             else:
                 print(f"  Warning: FSR geom '{gname}' not found, will use zero contact")
                 self.fsr_geom_ids.append(-1)
+                self.fsr_body_ids.append(-1)
 
     def _init_viewer(self):
         try:
@@ -298,16 +304,35 @@ class BaodingMujocoEnv:
         )
 
     def _get_fsr_contacts(self) -> np.ndarray:
-        """Binary contact detection for 16 FSR sensors."""
-        contacts = np.zeros(16, dtype=np.float32)
+        """FSR contact: body-level net force -> norm -> threshold -> binary (align with Isaac Gym).
+
+        Isaac uses contact_tensor (per-body 3D force), norm, then threshold in [1.0, 1.0+sensorThresh].
+        We compute per-body net contact force via mj_contactForce + contact frame, then for each FSR's
+        body take force norm and binarize with fsr_force_threshold.
+        """
+        body_forces = np.zeros((self.model.nbody, 3), dtype=np.float64)
         for ci in range(self.data.ncon):
             c = self.data.contact[ci]
-            g1, g2 = c.geom1, c.geom2
-            for si, gid in enumerate(self.fsr_geom_ids):
-                if gid < 0:
-                    continue
-                if g1 == gid or g2 == gid:
-                    contacts[si] = 1.0
+            geom1_id = c.geom1
+            geom2_id = c.geom2
+            body1_id = self.model.geom_bodyid[geom1_id]
+            body2_id = self.model.geom_bodyid[geom2_id]
+            frame = c.frame.reshape(3, 3)
+            normal = frame[0]
+            tangent1, tangent2 = frame[1], frame[2]
+            force6 = np.zeros(6)
+            mujoco.mj_contactForce(self.model, self.data, ci, force6)
+            fx, fy, fz = force6[0], force6[1], force6[2]
+            force_world = fx * normal + fy * tangent1 + fz * tangent2
+            body_forces[body2_id] += force_world
+            body_forces[body1_id] -= force_world
+        contacts = np.zeros(16, dtype=np.float32)
+        thresh = self.fsr_force_threshold
+        for si, body_id in enumerate(self.fsr_body_ids):
+            if body_id < 0:
+                continue
+            force_norm = float(np.linalg.norm(body_forces[body_id]))
+            contacts[si] = 1.0 if force_norm >= thresh else 0.0
         return contacts
 
     def get_hand_qpos(self) -> np.ndarray:

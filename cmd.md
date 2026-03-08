@@ -1,8 +1,8 @@
 # 仅 test（不录轨迹）
-bash scripts/teacher_baoding.sh 0 test=True checkpoint=/home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-07_18-09-49-83810/nn/last_baoding_ep_1400_rew_1196.1826.pth headless=False task.env.numEnvs=16
+bash scripts/teacher_baoding.sh 0 test=True checkpoint=/home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-08_00-55-05-83810/nn/last_baoding_ep_2700_rew_1234.712.pth headless=False task.env.numEnvs=16
 
 # Test + 记录 env0 灵巧手关节期望到 CSV（文件名按时间生成：runs/env0_trajectory_YYYYMMDD_HHMMSS.csv）
-bash scripts/teacher_baoding.sh 0 test=True checkpoint=/home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-07_18-09-49-83810/nn/last_baoding_ep_1400_rew_1196.1826.pth headless=False task.env.numEnvs=16 task.env.recordEnv0TrajectoryCsv=runs
+bash scripts/teacher_baoding.sh 0 test=True checkpoint=/home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-08_00-55-05-83810/nn/last_baoding_ep_2700_rew_1234.712.pth headless=False task.env.numEnvs=16 task.env.recordEnv0TrajectoryCsv=runs
 
 mkdir -p /home/jizexian/dexhand/in-hand-rotation/.mujoco
 
@@ -18,13 +18,15 @@ cd /home/jizexian/dexhand/in-hand-rotation/.mujoco/mujoco210/bin
 ./simulate /home/jizexian/dexhand/in-hand-rotation/assets/urdf/xarm6/xarm6_allegro_right_fsr_2023_thin_tilted.xml
 
 # MuJoCo 策略推理
-python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-02-23_14-41-32-83810/nn/last_baoding_ep_4200_rew_1296.3552.pth
+python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-02-23_14-41-32-83810/nn/last_baoding_ep_4200_rew_1296.3552.pth --slow 5
 
-python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-08_00-55-05-83810/nn/last_baoding_ep_800_rew_1218.9548.pth
+python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-08_00-55-05-83810/nn/last_baoding_ep_2700_rew_1234.712.pth --slow 20
 
 # MuJoCo 离线轨迹跟踪（读 CSV，不加载策略，用于 sim2sim 环境一致性验证）
 # 注意：CSV 必须用修复后的 Isaac 代码录制（header 包含真实 DOF 名称），旧 CSV 的 header 有误不可用
-python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --trajectory-csv /home/jizexian/dexhand/in-hand-rotation/runs/env0_trajectory_20260306_022644.csv
+python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --trajectory-csv /home/jizexian/dexhand/in-hand-rotation/runs/env0_trajectory_20260308_173105.csv --slow 20
+
+python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --trajectory-csv /home/jizexian/dexhand/in-hand-rotation/runs/env0_trajectory_20260306_022644.csv --slow 5
 
 
 # Isaac Gym DOF 排序说明：
@@ -105,6 +107,23 @@ python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --trajector
 # [ ] FSR 语义差异：Isaac 力阈值+延迟+噪声，MuJoCo 仅“是否接触”二值 → 可能导致策略在 MuJoCo 下看到不同 contact 分布
 # [ ] 初始状态：两球/手的 reset 位置、spin_axis 是否与 Isaac 一致
 # [ ] 物理/控制：PD 增益、substeps、control_freq_inv、关节限位、摩擦等
+
+# ---------- 关节 range/limits 对齐（两边顺序不一致时的处理） ----------
+#
+# 【顺序】
+# - Isaac：arm_hand_dof_lower/upper_limits 来自 get_asset_dof_properties(asset)，顺序 = Asset DOF 顺序（与 arm_hand_dof_pos 一致）。手部为 init 里 hand_qpos_init_override 的键顺序：joint_0,1,2,3, 12,13,14,15, 4..11（即 finger0, thumb, finger1, finger2）。
+# - MuJoCo：HAND_JOINT_NAMES = joint_0.0..joint_15.0（数值顺序）；ARM 为 joint1..6。env.py 中 HAND_LOWER/UPPER_LIMITS、ALL_LOWER/UPPER 均为该顺序。
+#
+# 【使用方式】
+# - Isaac：unscale(dof_pos, lower, upper)、scale(actions, lower, upper)、clamp(targets, lower, upper) 全程用同一索引 → limits 与 state/action 同序，无顺序问题。
+# - MuJoCo 观测：hand_qpos、prev_targets 为 MuJoCo 序；用 all_lower/all_upper（MuJoCo 序）做 unscale，得到 scaled 再按 ISAAC_HAND_ORDER 重排写入 frame[6:22]、frame[29:45] → 每个关节用到的 limit 与自身一致，仅输出顺序变为 Isaac 序。
+# - MuJoCo 控制：step() 中 actions 为 Isaac 序，经 MUJOCO_TO_ISAAC_ACTION 转为 MuJoCo 序后与 prev_targets 相加；clip(targets, ALL_LOWER, ALL_UPPER) 时 targets 与 ALL_* 均为 MuJoCo 序，正确。step_from_targets() 的 targets 由 load_trajectory_csv 重排为 MuJoCo 序后传入，clip 亦正确。
+#
+# 【数值】
+# - 臂：URDF (tilted) 与 env.py 的 ARM_LOWER/UPPER 一致（如 0, 0.673, -0.91601, 3.1416, 2.263, -1.56901 等）。
+# - 手：URDF 与 env.py 的 HAND_LOWER/UPPER（按 joint_0..15）一致：finger0/1/2 各 (-0.47,0.47), (-0.196,1.61), (-0.174,1.709), (-0.227,1.618)；拇指 (0.70,1.396), (0.3,1.163), (-0.189,1.644), (-0.162,1.719)。XML 中 range= 与上述一致。
+#
+# 结论：两边关节 range 数值一致；MuJoCo 侧 limits 按自身 DOF 顺序使用，观测/控制处已按 ISAAC_HAND_ORDER 与 MUJOCO_TO_ISAAC_ACTION 处理顺序差异，无需再对 limits 做重排。
 
 # ---------- API 手册调研：两边变量与坐标系是否对齐（仅调研，未改代码） ----------
 #
