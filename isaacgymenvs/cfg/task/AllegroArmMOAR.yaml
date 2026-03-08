@@ -47,7 +47,7 @@ env:
   # 触觉/接触相关：域随机化与观测处理
   sensorThresh: 1.0   # 每 reset 随机 contact_thresh 在 [1.0, 1.0+sensorThresh]，用于二值化 FSR
   sensorNoise: 0.1    # 触觉信号以该概率被置 0（mask）
-  obs_stack: 4
+  obs_stack: 8
   latency: 0.0       # 以该概率保留上一帧触觉（延迟一帧）
   m_low: 0.15
   m_up: 0.35
@@ -133,7 +133,7 @@ task:
       distribution: "gaussian"
     sim_params:
       gravity:
-        range: [0, 0.3]
+        range: [0, 0.5]
         operation: "additive"
         distribution: "gaussian"
     actor_params:

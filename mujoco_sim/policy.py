@@ -36,7 +36,7 @@ class PolicyNetwork(nn.Module):
         mu:        Linear(256, act_dim)  (no activation)
     """
 
-    def __init__(self, obs_dim: int = 366, act_dim: int = 22):
+    def __init__(self, obs_dim: int = 706, act_dim: int = 22):
         super().__init__()
         self.obs_dim = obs_dim
         self.act_dim = act_dim
@@ -61,7 +61,7 @@ class PolicyNetwork(nn.Module):
         return torch.clamp(action, -1.0, 1.0)
 
     @staticmethod
-    def from_checkpoint(path: str, obs_dim: int = 366, act_dim: int = 22,
+    def from_checkpoint(path: str, obs_dim: int = 706, act_dim: int = 22,
                         device: str = "cpu") -> "PolicyNetwork":
         """Load a trained policy from an rl_games .pth checkpoint.
 
@@ -113,7 +113,7 @@ def test_policy(checkpoint_path: Optional[str] = None):
         policy = PolicyNetwork()
         print("[test] Using randomly initialized network (no checkpoint)")
 
-    obs = torch.randn(1, 366)
+    obs = torch.randn(1, 706)
     with torch.no_grad():
         action = policy(obs)
 

@@ -20,7 +20,7 @@ cd /home/jizexian/dexhand/in-hand-rotation/.mujoco/mujoco210/bin
 ./simulate /home/jizexian/dexhand/in-hand-rotation/assets/urdf/xarm6/xarm6_allegro_right_fsr_2023_thin_tilted.xml
 
 # MuJoCo 策略推理
-python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-08_22-38-18-83810/nn/baoding.pth --slow 2
+python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-09_01-38-21-83810/nn/baoding.pth --slow 2
 
 python -m mujoco_sim.run --xml mujoco_sim/assets/allegro_baoding.xml --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-08_00-55-05-83810/nn/last_baoding_ep_2700_rew_1234.712.pth --slow 20
 

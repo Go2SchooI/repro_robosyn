@@ -235,7 +235,7 @@ class BaodingMujocoEnv:
             actions: (22,) array in [-1, 1], from the policy network (Isaac DOF order).
 
         Returns:
-            obs: (366,) observation vector.
+            obs: (706,) observation vector.
         """
         # Policy was trained in Isaac; action is in Isaac hand order (finger0, thumb, finger1, finger2).
         # prev_targets is in MuJoCo order (joint_0..15). Reorder action to MuJoCo before adding.
@@ -266,7 +266,7 @@ class BaodingMujocoEnv:
                      Same order as CSV from Isaac Gym recordEnv0TrajectoryCsv.
 
         Returns:
-            obs: (366,) observation vector.
+            obs: (706,) observation vector.
         """
         targets = np.asarray(targets, dtype=np.float64)
         assert targets.shape == (22,), f"targets must be (22,), got {targets.shape}"
@@ -279,7 +279,7 @@ class BaodingMujocoEnv:
         return obs
 
     def _get_obs(self) -> np.ndarray:
-        """Build the 366-dim observation from current MuJoCo state."""
+        """Build the 706-dim observation from current MuJoCo state."""
         hand_qpos = self.data.qpos[self.hand_qpos_idx]
         fsr_contacts = self._get_fsr_contacts()
 

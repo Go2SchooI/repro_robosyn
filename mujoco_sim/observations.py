@@ -1,10 +1,10 @@
 """M3: Observation builder for the baoding task.
 
-Constructs the 366-dim full_stack_baoding observation vector matching
+Constructs the 706-dim full_stack_baoding observation vector matching
 the Isaac Gym environment exactly:
-  - 85 dims per frame x 4 stacked frames = 340 dims
+  - 85 dims per frame x 8 stacked frames = 680 dims
   - 13 dims x 2 balls privileged info = 26 dims
-  Total = 366 dims
+  Total = 706 dims
 
 Hand joint order alignment:
   Isaac Gym orders hand DOFs by URDF child name sort: finger0, thumb, finger1, finger2
@@ -27,7 +27,7 @@ ISAAC_HAND_ORDER = np.array([0, 1, 2, 3, 12, 13, 14, 15, 4, 5, 6, 7, 8, 9, 10, 1
 MUJOCO_TO_ISAAC_ACTION = np.array([0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14, 15, 4, 5, 6, 7], dtype=np.intp)
 
 N_OBS_DIM = 85
-N_STACK = 4
+N_STACK = 8
 N_PRIV_PER_BALL = 13
 N_BALLS = 2
 OBS_TOTAL = N_OBS_DIM * N_STACK + N_PRIV_PER_BALL * N_BALLS  # 366
@@ -82,7 +82,7 @@ class ObservationBuilder:
         fsr_contacts: np.ndarray,
         ball_states: List[dict],
     ) -> np.ndarray:
-        """Build the full 366-dim observation.
+        """Build the full 706-dim observation.
 
         Args:
             hand_qpos: (16,) current hand joint positions
@@ -92,7 +92,7 @@ class ObservationBuilder:
                 'pos': (3,), 'quat_xyzw': (4,), 'linvel': (3,), 'angvel': (3,)
 
         Returns:
-            obs: (366,) float32 array
+            obs: (706,) float32 array
         """
         frame = self._build_frame(hand_qpos, prev_targets, fsr_contacts)
 
