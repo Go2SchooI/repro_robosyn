@@ -497,6 +497,17 @@ class AllegroArmMOAR(VecTask):
             self.contact_thresh[:] = torch.rand_like(self.contact_thresh) * self.sensor_thresh + 1.0
             self.compute_observations()
 
+            if self.is_test:
+                obs0 = self.obs_buf[0].detach().cpu().numpy()
+                np.set_printoptions(precision=6, suppress=True, linewidth=200)
+                print("\n=== [DEBUG] Isaac Gym env0 initial obs (len={}) ===".format(len(obs0)))
+                n = self.n_obs_dim
+                for f in range(self.n_stack):
+                    s, e = f * n, (f + 1) * n
+                    print(f"  frame[{f}] = {obs0[s:e]}")
+                print(f"  priv[{self.n_stack * n}:{len(obs0)}] = {obs0[self.n_stack * n:]}")
+                print("=== [DEBUG] end ===\n")
+
     def get_internal_state(self):
         return self.root_state_tensor[self.object_indices, 3:7]
 
@@ -1551,9 +1562,11 @@ class AllegroArmMOAR(VecTask):
                                                        self.arm_hand_dof_lower_limits,
                                                        self.arm_hand_dof_upper_limits)[:, 6:22]
 
-            init_obs_ids = torch.where(self.init_stack_buf == 1)
-            self.init_stack_buf[init_obs_ids] = 0
-            self.obs_buf[init_obs_ids][:, :-13*2] = self.last_obs_buf[init_obs_ids].repeat(1, self.n_stack)
+            init_mask = self.init_stack_buf == 1
+            if init_mask.any():
+                init_ids = init_mask.nonzero(as_tuple=False).squeeze(-1)
+                self.init_stack_buf[init_ids] = 0
+                self.obs_buf[init_ids, :-13*2] = self.last_obs_buf[init_ids].repeat(1, self.n_stack)
             self.obs_buf = torch.cat((self.last_obs_buf.clone(), self.obs_buf[:, :-self.n_obs_dim-13*2]), dim=-1)
             self.finger_contacts = gt_contacts
             self.tip_contacts = tip_contacts
@@ -1840,7 +1853,9 @@ class AllegroArmMOAR(VecTask):
         self.randomize_d_gain_lower = self.d_gain_val * 0.75
         self.randomize_d_gain_upper = self.d_gain_val * 1.05
 
-        if self.obs_type == 'partial_stack' or self.obs_type == 'full_stack' or self.obs_type == 'full_stack_pointcloud' or self.obs_type == 'partial_stack_pointcloud':
+        if self.obs_type in ('partial_stack', 'full_stack', 'full_stack_pointcloud',
+                              'partial_stack_pointcloud', 'full_stack_baoding',
+                              'partial_stack_baoding'):
             self.obs_buf[env_ids] = 0
             self.init_stack_buf[env_ids] = 1
 

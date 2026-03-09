@@ -241,11 +241,10 @@ class DistillWarmUpTrainer:
         assert teacher_resume is not None
         self.teacher_data_dir = teacher_data_dir
 
-    def mini_batch_generator(self, num_mini_batches):
-        batch_size = 200 * 256 * self.mini_data_size  # self.vec_env.env.num_envs * self.num_transitions_per_env
+    def mini_batch_generator(self, num_mini_batches, batch_size=None):
+        if batch_size is None:
+            batch_size = 200 * 256 * self.mini_data_size
         mini_batch_size = batch_size // num_mini_batches
-        # For physics-based RL, each environment is already randomized. There is no value to doing random sampling
-        # but a lot of CPU overhead during the PPO process. So, we can just switch to a sequential sampler instead
         subset = SequentialSampler(range(batch_size))
 
         batch = BatchSampler(subset, mini_batch_size, drop_last=True)
@@ -429,7 +428,6 @@ class DistillWarmUpTrainer:
     def update(self, it):
         mean_bc_loss = 0
 
-        batch = self.mini_batch_generator(self.num_mini_batches)
         teacher_obs_storage, teacher_actions_storage, teacher_sigmas_storage, teacher_pointcloud_storage = [], [], [], []
         teacher_file_list = os.listdir(self.teacher_data_dir)
         for idx_worker in range(self.mini_data_size):
@@ -461,6 +459,9 @@ class DistillWarmUpTrainer:
             print(teacher_obs_storage.shape, teacher_actions_storage.shape, teacher_sigmas_storage.shape)
         else:
             raise NotImplementedError
+
+        actual_batch_size = teacher_obs_storage.shape[0]
+        batch = self.mini_batch_generator(self.num_mini_batches, batch_size=actual_batch_size)
 
         self.num_learning_epochs = 1
         for epoch in range(self.num_learning_epochs):

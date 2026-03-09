@@ -130,6 +130,16 @@ def run(
 
     print("\n[3/3] Running inference loop...")
     obs = env.reset()
+
+    np.set_printoptions(precision=6, suppress=True, linewidth=200)
+    from mujoco_sim.observations import N_OBS_DIM, N_STACK
+    print(f"\n=== [DEBUG] MuJoCo initial obs (len={len(obs)}) ===")
+    for f in range(N_STACK):
+        s, e = f * N_OBS_DIM, (f + 1) * N_OBS_DIM
+        print(f"  frame[{f}] = {obs[s:e]}")
+    print(f"  priv[{N_STACK * N_OBS_DIM}:{len(obs)}] = {obs[N_STACK * N_OBS_DIM:]}")
+    print("=== [DEBUG] end ===\n")
+
     total_reward = 0.0
 
     for step in range(max_steps):

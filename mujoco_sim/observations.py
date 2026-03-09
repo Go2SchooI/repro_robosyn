@@ -45,11 +45,13 @@ class ObservationBuilder:
         [45:61] FSR tactile sensors (binary, 16 dims)
         [61:85] spin axis repeated 8x = [0,0,1]*8 (24 dims)
 
-    Privileged info per ball (13 dims):
-        [0:3]   position (x,y,z)
-        [3:7]   quaternion (x,y,z,w) -- Isaac Gym convention
-        [7:10]  linear velocity
-        [10:13] angular velocity * 0.2
+    Privileged info (26 dims, field-major, matching Isaac Gym reshape):
+        [0:7]   ball1 pose (pos3 + quat4 xyzw)
+        [7:14]  ball2 pose (pos3 + quat4 xyzw)
+        [14:17] ball1 linear velocity
+        [17:20] ball2 linear velocity
+        [20:23] ball1 angular velocity * 0.2
+        [23:26] ball2 angular velocity * 0.2
     """
 
     def __init__(
@@ -137,12 +139,19 @@ class ObservationBuilder:
         return frame
 
     def _build_privileged(self, ball_states: List[dict]) -> np.ndarray:
-        """Build 26-dim privileged observation for 2 balls."""
+        """Build 26-dim privileged observation for 2 balls.
+
+        Isaac Gym uses field-major layout (all poses, then all linvels, then
+        all angvels) via reshape(-1, K*2), NOT ball-major.
+        Layout: [ball1_pose(7), ball2_pose(7),
+                 ball1_linvel(3), ball2_linvel(3),
+                 ball1_angvel*0.2(3), ball2_angvel*0.2(3)]
+        """
         priv = np.zeros(N_PRIV_PER_BALL * N_BALLS, dtype=np.float32)
         for i, bs in enumerate(ball_states):
-            offset = i * N_PRIV_PER_BALL
-            priv[offset:offset + 3] = bs["pos"]
-            priv[offset + 3:offset + 7] = bs["quat_xyzw"]
-            priv[offset + 7:offset + 10] = bs["linvel"]
-            priv[offset + 10:offset + 13] = bs["angvel"] * VEL_OBS_SCALE
+            priv[i * 7:(i + 1) * 7] = np.concatenate([bs["pos"], bs["quat_xyzw"]])
+        for i, bs in enumerate(ball_states):
+            priv[14 + i * 3:14 + (i + 1) * 3] = bs["linvel"]
+        for i, bs in enumerate(ball_states):
+            priv[20 + i * 3:20 + (i + 1) * 3] = bs["angvel"] * VEL_OBS_SCALE
         return priv

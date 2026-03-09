@@ -133,7 +133,7 @@ task:
       distribution: "gaussian"
     sim_params:
       gravity:
-        range: [0, 0.5]
+        range: [0, 0.3]
         operation: "additive"
         distribution: "gaussian"
     actor_params:
