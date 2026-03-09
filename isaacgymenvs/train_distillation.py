@@ -188,10 +188,15 @@ def launch_rlg_hydra(cfg: DictConfig):
     with open(os.path.join(experiment_dir, 'config.yaml'), 'w') as f:
         f.write(OmegaConf.to_yaml(cfg))
 
-    distiller.run(
-        num_learning_iterations=distill_iterations,
-        log_interval=cfg_distill["learn"]["save_interval"]
-    )
+    if cfg_distill.bc_training == "test":
+        student_ckpt = "{}/{}.pth".format(
+            cfg_distill.student_logdir, cfg_distill.student_resume)
+        distiller.test_run(student_ckpt, num_steps=distill_iterations)
+    else:
+        distiller.run(
+            num_learning_iterations=distill_iterations,
+            log_interval=cfg_distill["learn"]["save_interval"]
+        )
 
     if cfg.wandb_activate and rank == 0:
         wandb.finish()

@@ -38,6 +38,8 @@ scripts/collect_baoding.sh 0 \
 
 scripts/bc_baoding.sh 0 distill.teacher_data_dir=/home/jizexian/dexhand/in-hand-rotation/demonstration-baoding
 
+scripts/test_bc_baoding.sh 0 headless=false distill.student_logdir=runs/student/bc-baoding-multimodplus   distill.student_resume=model_bc_800 task.env.numEnvs=16
+
 # Isaac Gym DOF 排序说明：
 # Isaac Gym 按 URDF 分支节点的子 joint 名称的字典序排列，因此 Allegro 手的 hand DOF 顺序为：
 #   finger0 (joint_0-3.0), thumb (joint_12-15.0), finger1 (joint_4-7.0), finger2 (joint_8-11.0)

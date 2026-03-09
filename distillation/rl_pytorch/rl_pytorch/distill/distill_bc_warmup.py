@@ -362,6 +362,101 @@ class DistillWarmUpTrainer:
         res_dict = model(batch_dict)
         return res_dict
     
+    def _build_student_obs(self, current_obs):
+        """Convert environment obs_dict into the format expected by the student network."""
+        student_obs = current_obs['obs']['student_obs'].clone()
+
+        if self.ablation_mode == "no-pc":
+            return {"obs": student_obs}
+
+        pc = current_obs['obs']['pointcloud'].clone()
+
+        if self.ablation_mode == "no-tactile":
+            student_obs = torch.cat([
+                student_obs[:, :45], student_obs[:, 61:130],
+                student_obs[:, 146:215], student_obs[:, 231:300],
+                student_obs[:, 316:]], dim=-1)
+            pc = pc[:, :680, :]
+        elif self.ablation_mode == "aug":
+            pc = pc[:, :680, :]
+        elif self.ablation_mode == "multi-modality-plus":
+            if pc.shape[1] == 808:
+                pad_point_1 = -torch.tensor([5.7225e-01, 1.0681e-04, 1.7850e-01], device=pc.device)
+                pad_point_2 = -torch.tensor([5.3432e-01, -1.5243e-06, 2.0256e-01], device=pc.device)
+                for i in range(pc.shape[0]):
+                    zeros = torch.where(pc[i, :, :3] == pad_point_1)
+                    pc[i][zeros[0]] = pc[i, 0, :].clone()
+                    zeros2 = torch.where(pc[i, :, :3] == pad_point_2)
+                    pc[i][zeros2[0]] = pc[i, 0, :].clone()
+
+        return {"obs": {"obs": student_obs, "pointcloud": pc}}
+
+    def test_run(self, student_checkpoint, num_steps=1000):
+        """Run student policy in the environment for evaluation."""
+        self.student_load(student_checkpoint)
+        self.student_actor_critic.eval()
+
+        current_obs = self.vec_env.reset()
+
+        num_envs = self.vec_env.env.num_envs
+        cur_reward_sum = torch.zeros(num_envs, dtype=torch.float, device=self.device)
+        cur_episode_length = torch.zeros(num_envs, dtype=torch.float, device=self.device)
+
+        reward_sum = []
+        episode_length = []
+
+        for step in range(num_steps):
+            student_input = self._build_student_obs(current_obs)
+
+            with torch.no_grad():
+                res_dict = self.get_action_values(
+                    self.student_actor_critic, student_input, mode='student')
+                actions = res_dict['mus']
+
+            next_obs, rews, dones, infos = self.vec_env.step(
+                torch.clamp(actions, -1.0, 1.0))
+            current_obs = next_obs
+
+            cur_reward_sum += rews.detach()
+            cur_episode_length += 1
+
+            new_ids = (dones > 0).nonzero(as_tuple=False)
+            if len(new_ids) > 0:
+                reward_sum.extend(
+                    cur_reward_sum[new_ids][:, 0].detach().cpu().numpy().tolist())
+                episode_length.extend(
+                    cur_episode_length[new_ids][:, 0].detach().cpu().numpy().tolist())
+                cur_reward_sum[new_ids] = 0
+                cur_episode_length[new_ids] = 0
+
+            if step % 100 == 99 and len(reward_sum) > 0:
+                print(f"Step {step+1}/{num_steps} | "
+                      f"Mean reward: {np.mean(reward_sum):.2f} | "
+                      f"Mean ep length: {np.mean(episode_length):.1f} | "
+                      f"Episodes: {len(reward_sum)}")
+
+        consecutive_successes = self.vec_env.env.consecutive_successes.float().mean().item()
+
+        print("\n" + "=" * 60)
+        print("Student Policy Test Results")
+        print("=" * 60)
+        if len(reward_sum) > 0:
+            print(f"Total episodes completed: {len(reward_sum)}")
+            print(f"Mean reward: {np.mean(reward_sum):.2f} +/- {np.std(reward_sum):.2f}")
+            print(f"Mean episode length: {np.mean(episode_length):.1f}")
+            print(f"Consecutive successes: {consecutive_successes:.2f}")
+        else:
+            print("No episodes completed during evaluation.")
+        print("=" * 60)
+
+        return {
+            'mean_reward': np.mean(reward_sum) if reward_sum else 0,
+            'std_reward': np.std(reward_sum) if reward_sum else 0,
+            'mean_episode_length': np.mean(episode_length) if episode_length else 0,
+            'num_episodes': len(reward_sum),
+            'consecutive_successes': consecutive_successes,
+        }
+
     def run(self, num_learning_iterations, log_interval=1):
         current_obs = self.vec_env.reset()
         current_states = self.vec_env.env.get_state()
