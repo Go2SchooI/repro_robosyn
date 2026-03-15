@@ -1075,6 +1075,8 @@ class AllegroArmMOAR(VecTask):
             raise NotImplementedError
 
         self.extras['consecutive_successes'] = self.consecutive_successes.mean()
+        # 暴露绕轴旋转进度 theta 为标量，供 S1 meta / 分层评估 / retrieval 使用（不作为主监督 target）
+        self.extras['spin_progress'] = theta.detach()
 
         if self.print_success_stat:
             self.total_resets = self.total_resets + self.reset_buf.sum()

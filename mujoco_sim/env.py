@@ -15,7 +15,7 @@ from mujoco_sim.utils import (
     HAND_JOINT_NAMES, ARM_JOINT_NAMES, FSR_GEOM_NAMES,
     quat_wxyz_to_xyzw, unscale, scale,
 )
-from mujoco_sim.observations import ObservationBuilder, MUJOCO_TO_ISAAC_ACTION
+from mujoco_sim.observations import ObservationBuilder, MUJOCO_TO_ISAAC_ACTION, ISAAC_HAND_ORDER
 
 
 # Arm default positions (from the tilted URDF locked joints)
@@ -257,6 +257,12 @@ class BaodingMujocoEnv:
 
         obs = self._get_obs()
         return obs
+
+    def get_pd_targets_isaac_order(self) -> np.ndarray:
+        """返回本步实际送入 PD 的关节目标 (22,)，顺序与 Isaac 一致（arm 0:6，手 6:22 为 finger0, thumb, finger1, finger2）。"""
+        hand_mujoco = self.prev_targets[6:22]
+        hand_isaac = hand_mujoco[ISAAC_HAND_ORDER]
+        return np.concatenate([self.prev_targets[:6].copy(), hand_isaac]).astype(np.float32)
 
     def step_from_targets(self, targets: np.ndarray) -> np.ndarray:
         """Execute one control step using given joint targets (offline trajectory tracking).
