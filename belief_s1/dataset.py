@@ -107,8 +107,11 @@ def load_npz_samples(path: str, verbose: bool = True) -> List[Dict[str, Any]]:
 
 
 def load_pt_samples(path: str) -> List[Dict[str, Any]]:
-    """加载 .pt（list of dict 或单 dict 含 list）。"""
-    x = torch.load(path, map_location="cpu", weights_only=True)
+    """加载 .pt（list of dict 或单 dict 含 list）。格式不兼容时跳过并返回 []。"""
+    try:
+        x = torch.load(path, map_location="cpu", weights_only=False)
+    except Exception:
+        return []
     if isinstance(x, list):
         return x
     if isinstance(x, dict):

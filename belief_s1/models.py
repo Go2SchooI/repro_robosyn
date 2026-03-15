@@ -16,13 +16,13 @@ from .schema import N_DEPLOY, N_PRIV_TARGET
 
 
 class Encoder(nn.Module):
-    """E: deployable observation history -> latent z."""
+    """E: deployable observation history -> latent z. 默认 680 -> 512 -> 512 -> 256 -> 128."""
 
     def __init__(
         self,
         input_dim: int = N_DEPLOY,
-        latent_dim: int = 64,
-        hidden: Tuple[int, ...] = (256, 256),
+        latent_dim: int = 128,
+        hidden: Tuple[int, ...] = (512, 512, 256),
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -43,11 +43,11 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    """D: z -> priv_target (K 维)."""
+    """D: z -> priv_target (K 维). 默认 128 -> 128 -> 128 -> 5."""
 
     def __init__(
         self,
-        latent_dim: int = 64,
+        latent_dim: int = 128,
         out_dim: int = N_PRIV_TARGET,
         hidden: Tuple[int, ...] = (128, 128),
     ):
@@ -65,14 +65,14 @@ class Decoder(nn.Module):
 
 
 class DynamicsHead(nn.Module):
-    """G: (z, action) -> priv_target_t_plus_1."""
+    """G: (z, action) -> priv_target_t_plus_1. 默认 (128+22) -> 256 -> 256 -> 128 -> 5."""
 
     def __init__(
         self,
-        latent_dim: int = 64,
+        latent_dim: int = 128,
         action_dim: int = 22,
         out_dim: int = N_PRIV_TARGET,
-        hidden: Tuple[int, ...] = (128, 128),
+        hidden: Tuple[int, ...] = (256, 256, 128),
     ):
         super().__init__()
         inp = latent_dim + action_dim
@@ -90,17 +90,17 @@ class DynamicsHead(nn.Module):
 
 
 class S1BeliefModel(nn.Module):
-    """E + D + G 组合，用于 S1 训练与评估。"""
+    """E + D + G 组合，用于 S1 训练与评估。默认: E 680->512->512->256->128, D 128->128->128->5, G (128+22)->256->256->128->5."""
 
     def __init__(
         self,
         obs_dim: int = N_DEPLOY,
         action_dim: int = 22,
         priv_target_dim: int = N_PRIV_TARGET,
-        latent_dim: int = 64,
-        enc_hidden: Tuple[int, ...] = (256, 256),
+        latent_dim: int = 128,
+        enc_hidden: Tuple[int, ...] = (512, 512, 256),
         dec_hidden: Tuple[int, ...] = (128, 128),
-        dyn_hidden: Tuple[int, ...] = (128, 128),
+        dyn_hidden: Tuple[int, ...] = (256, 256, 128),
     ):
         super().__init__()
         self.encoder = Encoder(obs_dim, latent_dim, enc_hidden)

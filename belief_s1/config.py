@@ -17,10 +17,10 @@ class S1Config:
     obs_dim: int = N_DEPLOY
     action_dim: int = 22
     priv_target_dim: int = N_PRIV_TARGET
-    latent_dim: int = 64
-    enc_hidden: Tuple[int, ...] = (256, 256)
+    latent_dim: int = 128
+    enc_hidden: Tuple[int, ...] = (512, 512, 256)
     dec_hidden: Tuple[int, ...] = (128, 128)
-    dyn_hidden: Tuple[int, ...] = (128, 128)
+    dyn_hidden: Tuple[int, ...] = (256, 256, 128)
 
     # 训练
     batch_size: int = 256
@@ -28,4 +28,4 @@ class S1Config:
     epochs: int = 100
     device: str = "cuda"
     log_dir: str = "runs/belief_s1"
-    save_every: int = 10
+    save_every: int = 100

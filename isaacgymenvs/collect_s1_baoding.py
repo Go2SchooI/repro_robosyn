@@ -142,7 +142,10 @@ def run_collect(cfg, out_dir: str, num_steps: int, checkpoint_path: str = None, 
                 spin_progress = float(sp[0]) if hasattr(sp, "__getitem__") else float(sp)
             except Exception:
                 pass
+        # 若 env 0 本步 done，则 next_obs[0] 多为 reset 后首帧，不能作为动力学目标，需标 done 以便训练时 mask
+        done_env0 = bool(dones[0]) if hasattr(dones, "__getitem__") else bool(dones)
         meta = get_meta_template("isaac", episode_id, step_in_ep, success=-1, spin_progress=spin_progress)
+        meta["done"] = done_env0
         samples.append({
             "obs_deploy": obs_deploy.copy(),
             "action": action.copy(),

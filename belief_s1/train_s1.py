@@ -12,11 +12,12 @@ S1 训练脚本：L_state + L_dyn，仅单域 belief learning。
 import argparse
 import os
 import sys
+from datetime import datetime
 
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 
 # 仓库根目录加入 path，便于单独运行
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -39,15 +40,9 @@ def parse_args():
     p.add_argument("--epochs", type=int, default=100)
     p.add_argument("--batch_size", type=int, default=256)
     p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--latent_dim", type=int, default=64)
-    p.add_argument("--log_dir", type=str, default="runs/belief_s1")
-    p.add_argument("--save_every", type=int, default=10)
     p.add_argument("--device", type=str, default="cuda")
     p.add_argument("--overfit_test", action="store_true", help="超小数据过拟合测试：max_samples=1024, epochs=500, 结束时打 per-dim MSE")
-    p.add_argument("--log_per_dim_interval", type=int, default=0, help="每 N 个 epoch 打印一次各维 MSE；0=不打印，过拟合测试可设 50")
     p.add_argument("--no_wandb", action="store_true", help="禁用 wandb 上报")
-    p.add_argument("--wandb_project", type=str, default="belief_s1", help="wandb 项目名")
-    p.add_argument("--wandb_run_name", type=str, default=None, help="wandb run 名称，默认按 data_dir/domain/时间生成")
     return p.parse_args()
 
 
@@ -58,19 +53,16 @@ def main():
     use_wandb = not args.no_wandb
     if use_wandb:
         import wandb
-        from datetime import datetime
-        run_name = args.wandb_run_name or "s1_{}_{}".format(
-            args.domain or "all", datetime.now().strftime("%Y%m%d_%H%M%S")
-        )
-        wandb.init(project=args.wandb_project, config=vars(args), name=run_name)
+        run_name = "s1_{}_{}".format(args.domain or "all", datetime.now().strftime("%Y%m%d_%H%M%S"))
+        wandb.init(project="belief_s1", config=vars(args), name=run_name)
         print("[S1] wandb 已初始化，run: {}".format(wandb.run.name if wandb.run else run_name), flush=True)
 
+    log_per_dim_interval = 0
     if args.overfit_test:
         args.max_samples = args.max_samples or 1024
         if args.epochs == 100:
             args.epochs = 500
-        if args.log_per_dim_interval == 0:
-            args.log_per_dim_interval = 50
+        log_per_dim_interval = 50
         print("[S1] 超小数据过拟合测试: max_samples={}, epochs={}".format(args.max_samples, args.epochs), flush=True)
 
     print("[S1] 正在加载数据...", flush=True)
@@ -89,32 +81,51 @@ def main():
     if use_wandb:
         wandb.log({"info/n_samples": n_samples}, step=0)
 
-    batch_size = min(args.batch_size, n_samples) if n_samples < args.batch_size else args.batch_size
+    val_ratio = 0.1
+    train_indices = list(range(n_samples))
+    val_indices = []
+    if val_ratio > 0 and n_samples > 10:
+        import random
+        random.Random(42).shuffle(train_indices)
+        n_val = max(1, int(n_samples * val_ratio))
+        val_indices = train_indices[-n_val:]
+        train_indices = train_indices[:-n_val]
+        print("[S1] 训练/验证划分: train {}  val {}".format(len(train_indices), len(val_indices)), flush=True)
+    else:
+        val_ratio = 0.0
+
+    batch_size = min(args.batch_size, len(train_indices)) if train_indices else args.batch_size
+    train_dataset = Subset(dataset, train_indices) if val_indices else dataset
     loader = DataLoader(
-        dataset,
+        train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=0,
         pin_memory=(device == "cuda"),
     )
 
+    # 在 log_dir 下按时间建子目录，避免多次训练互相覆盖
+    run_dir = os.path.join("runs/belief_s1", datetime.now().strftime("%Y%m%d_%H%M%S"))
+    os.makedirs(run_dir, exist_ok=True)
+    print("[S1] 本次 run 目录: {}".format(run_dir), flush=True)
+
     cfg = S1Config(
         data_dir=args.data_dir,
         domain=args.domain,
         max_samples=args.max_samples,
-        latent_dim=args.latent_dim,
+        latent_dim=128,
         batch_size=args.batch_size,
         lr=args.lr,
         epochs=args.epochs,
-        log_dir=args.log_dir,
-        save_every=args.save_every,
+        log_dir=run_dir,
+        save_every=100,
         device=device,
     )
     model = S1BeliefModel(
         obs_dim=cfg.obs_dim,
         action_dim=cfg.action_dim,
         priv_target_dim=cfg.priv_target_dim,
-        latent_dim=cfg.latent_dim,
+        latent_dim=128,
     ).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr)
     mse = nn.MSELoss()
@@ -134,10 +145,14 @@ def main():
             done = done.to(device)
             _, x_hat_t, x_hat_t1 = model(obs, action)
             l_state = mse(x_hat_t, priv_t)
-            # 仅对非 reset 后的 transition 算 L_dyn，避免用 reset 前后数据拟合动力学
+            # 仅对同 episode 内 transition 算 L_dyn：done=True 表示本步后 reset，priv_t_plus_1 非同一轨迹
             dyn_err = (x_hat_t1 - priv_t1).pow(2).sum(dim=-1)
             mask = (1.0 - done)
-            l_dyn = (dyn_err * mask).sum() / mask.sum().clamp(min=1e-6)
+            n_valid = mask.sum()
+            if n_valid > 0:
+                l_dyn = (dyn_err * mask).sum() / n_valid
+            else:
+                l_dyn = torch.tensor(0.0, device=obs.device, dtype=obs.dtype)
             loss = l_state + l_dyn
             opt.zero_grad()
             loss.backward()
@@ -149,10 +164,16 @@ def main():
         avg_d = total_dyn_loss / max(n_batches, 1)
         if use_wandb:
             wandb.log({"train/L_state": avg_s, "train/L_dyn": avg_d}, step=epoch)
-        print(f"[S1] epoch {epoch} L_state={avg_s:.6f} L_dyn={avg_d:.6f}", flush=True)
-        if args.log_per_dim_interval and (epoch + 1) % args.log_per_dim_interval == 0:
+        if (epoch + 1) % 20 == 0:
+            print(f"[S1] epoch {epoch} L_state={avg_s:.6f} L_dyn={avg_d:.6f}", flush=True)
+        if val_ratio > 0 and val_indices and (epoch + 1) % 20 == 0:
+            val_s, val_d = _eval_loss(model, dataset, val_indices, device)
+            if use_wandb:
+                wandb.log({"val/L_state": val_s, "val/L_dyn": val_d}, step=epoch)
+            print(f"       val  L_state={val_s:.6f} L_dyn={val_d:.6f}", flush=True)
+        if log_per_dim_interval and (epoch + 1) % log_per_dim_interval == 0:
             _log_per_dim_mse(model, dataset, device, args, use_wandb=use_wandb, step=epoch)
-        if (epoch + 1) % cfg.save_every == 0:
+        if (epoch + 1) % 100 == 0:
             path = os.path.join(cfg.log_dir, f"s1_ep{epoch+1}.pt")
             torch.save({"model": model.state_dict(), "epoch": epoch}, path)
             print(f"  保存: {path}", flush=True)
@@ -160,11 +181,34 @@ def main():
     torch.save({"model": model.state_dict(), "epoch": cfg.epochs - 1}, path_last)
     print(f"[S1] 训练结束，最后模型: {path_last}", flush=True)
 
-    if args.overfit_test or args.log_per_dim_interval:
+    if args.overfit_test or log_per_dim_interval:
         print("\n[S1] 全量 train set 各维 MSE（当前步 / 下一步）:", flush=True)
         _log_per_dim_mse(model, dataset, device, args, use_wandb=use_wandb, step=cfg.epochs - 1)
     if use_wandb:
         wandb.finish()
+
+
+def _eval_loss(model, dataset, indices, device):
+    """在给定样本下标上算平均 L_state 与 L_dyn（不反传），返回 (avg_L_state, avg_L_dyn)。"""
+    model.eval()
+    total_s, total_d, n_batch, n_dyn = 0.0, 0.0, 0, 0
+    with torch.no_grad():
+        for idx in indices:
+            obs, action, pt, pt1, done = dataset[idx]
+            obs = obs.unsqueeze(0).to(device)
+            action = action.unsqueeze(0).to(device)
+            pt = pt.unsqueeze(0).to(device)
+            pt1 = pt1.unsqueeze(0).to(device)
+            _, x_hat_t, x_hat_t1 = model(obs, action)
+            total_s += ((x_hat_t - pt) ** 2).sum().item()
+            n_batch += 1
+            if done.item() < 0.5:
+                total_d += ((x_hat_t1 - pt1) ** 2).sum().item()
+                n_dyn += 1
+    model.train()
+    avg_s = total_s / max(n_batch, 1)
+    avg_d = total_d / max(n_dyn, 1)
+    return avg_s, avg_d
 
 
 def _log_per_dim_mse(model, dataset, device, args, use_wandb=False, step=0):

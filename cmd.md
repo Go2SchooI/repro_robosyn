@@ -180,7 +180,7 @@ scripts/test_bc_baoding.sh 0 headless=false distill.student_logdir=runs/student/
 
 
 
-python -m belief_s1.collect_mujoco --xml mujoco_sim/assets/allegro_baoding.xml --out_dir data/s1_baoding --steps 1000 --checkpoint runs/baoding/baodingS1.0_C0.0_M0.02026-03-09_16-15-16-83810/nn/last_baoding_ep_700_rew_1143.5836.pth --action_noise 0.2
+python -m belief_s1.collect_mujoco --xml mujoco_sim/assets/allegro_baoding.xml --out_dir data/s1_baoding --steps 10000 --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/baoding/baodingS1.0_C0.0_M0.02026-03-09_16-15-16-83810/nn/last_baoding_ep_500_rew_1059.3208.pth --action_noise 0.5
 
 # ---------- 第二组：超小数据过拟合测试（S1 第一个模型测试） ----------
 # 目的：若连超小数据都过拟合不了，问题多半在数据/loss/对齐，而非方法。
@@ -192,3 +192,24 @@ python -m belief_s1.train_s1 --data_dir data/s1_baoding --domain mujoco --overfi
 # 用法三：仅限制样本数 + 手动 epoch，并每 20 epoch 打 per-dim
 python -m belief_s1.train_s1 --data_dir data/s1_baoding --max_samples 1024 --epochs 300 --log_per_dim_interval 20
 # 训练时默认上报 wandb（项目 --wandb_project 默认 belief_s1）；禁用：--no_wandb；自定义 run 名：--wandb_run_name xxx
+# 验证集默认 10%，每 20 个 epoch 打印一次 val；改间隔：--val_log_interval 10；不做验证：--val_ratio 0
+#
+# ---------- S1 正式训练（全量数据） ----------
+# 全量数据、较多 epoch、10% 验证、每 100 epoch 存盘、每 20 epoch 打 val：
+python -m belief_s1.train_s1 --data_dir data/s1_baoding --epochs 1000 
+
+# 只用 mujoco 域正式训练：
+python -m belief_s1.train_s1 --data_dir data/s1_baoding --domain mujoco --epochs 500 --val_ratio 0.1 --save_every 100
+# 不用 wandb、不做验证、快速跑通：
+python -m belief_s1.train_s1 --data_dir data/s1_baoding --epochs 200 --val_ratio 0 --no_wandb
+#
+# ---------- S1 验证（eval_s1） ----------
+# 训练后权重在 runs/belief_s1/YYYYMMDD_HHMMSS/ 下，用 eval_s1 在指定数据上算 MSE/MAE。
+# 基本用法（用最后一次保存的权重）：
+#   python -m belief_s1.eval_s1 --data_dir data/s1_baoding --checkpoint /home/jizexian/dexhand/in-hand-rotation/runs/belief_s1/20260316_014816/s1_last.pt
+# 只验证 mujoco 域：
+#   python -m belief_s1.eval_s1 --data_dir data/s1_baoding --checkpoint runs/belief_s1/YYYYMMDD_HHMMSS/s1_last.pt --domain mujoco
+# 用单独预留的验证集目录：
+#   python -m belief_s1.eval_s1 --data_dir data/s1_baoding_val --checkpoint runs/belief_s1/YYYYMMDD_HHMMSS/s1_last.pt
+# 验证某个 epoch 的 checkpoint：
+#   python -m belief_s1.eval_s1 --data_dir data/s1_baoding --checkpoint runs/belief_s1/YYYYMMDD_HHMMSS/s1_ep300.pt
